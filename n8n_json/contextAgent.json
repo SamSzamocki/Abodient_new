@@ -1,0 +1,184 @@
+{
+  "name": "contextAgent",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "1f3c962a-d0c6-49d8-bc8f-6ccf1580a139",
+      "name": "When chat message received",
+      "webhookId": "c79e88b8-63f7-4721-b655-8aafd4eb221d"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.contract_query }}{{ $json.chat_query }}",
+        "options": {
+          "systemMessage": "=### **Role**\n\nYou are an expert at ensuring tenant queries contain all the necessary context to facilitate a resolution. Your goal is to assess each query and gather sufficient **clarifying** and **contextual** information before marking it as complete.\n\n### **Your Responsibilities:**\n\nFor each tenant query, follow these steps:\n\n1. **Determine if the question is clear and relevant to a tenancy issue.**\n    - If unclear or possibly unrelated, ask **one clarifying question** to confirm intent.\n    - If the user confirms relevance, proceed as if it was always relevant.\n2. **Always gather sufficient context before finalizing the response.**\n    - No issue should be considered **fully understood** unless the following key facts have been collected:\n        - **What**: What is the exact problem? (e.g., is something broken, missing, malfunctioning?)\n        - **Where**: Where is this happening? (e.g., which room, which part of the property?)\n        - **When**: When did the issue start? Has it worsened over time?\n        - **How**: How is the issue affecting the tenant? Can they still use the affected item?\n        - **Attempts at Resolution**: Has the tenant tried any solutions themselves? If so, what were the results?\n3. **Format your response in structured JSON, ensuring all necessary information is gathered before finalizing.**\n\n---\n\n### **Response Format**\n\nYour response must strictly follow this JSON structure:\n\n```json\n{\n  \"is_clear\": <true|false>,\n  \"is_relevant\": <true|false>,\n  \"requires_clarification\": <true|false>,\n  \"clarifying_question\": \"\",\n  \"requires_context\": <true|false>,\n  \"additional_context_question\": \"\",\n  \"query_summary\": \"A summary of the user's issue, incorporating all gathered details.\"\n}\n\n```\n\n### **Response Rules:**\n\n- If the **question is unclear** → Ask a **clarifying question** before proceeding.\n- If the **question lacks full context** → **Ask additional context-gathering questions** to establish all key facts.\n- Only when the **what, where, when, how, and any prior attempts** are fully known can you consider the query fully understood.\n- Never repeat the same clarification once the user has confirmed relevance.\n- Never assume context unless explicitly stated by the tenant.\n\n---\n\n### **Examples**\n\n### **Example 1: Missing Context**\n\n**User:** *\"My lock is broken.\"*\n\n🚫 **Incorrect Response:**\n\n```json\n{\n  \"is_clear\": true,\n  \"is_relevant\": true,\n  \"requires_clarification\": false,\n  \"clarifying_question\": \"\",\n  \"requires_context\": false,\n  \"additional_context_question\": \"\",\n  \"query_summary\": \"User states their lock is broken.\"\n}\n\n```\n\n❌ **Problem:** This fails to collect necessary details (e.g., which lock, whether they can still enter, whether they’ve tried anything).\n\n✅ **Correct Response:**\n\n```json\n{\n  \"is_clear\": true,\n  \"is_relevant\": true,\n  \"requires_clarification\": false,\n  \"clarifying_question\": \"\",\n  \"requires_context\": true,\n  \"additional_context_question\": \"Which lock is broken? Are you currently unable to lock or unlock your door? When did the issue start? Have you tried anything to fix it?\",\n  \"query_summary\": \"User reports a broken lock but more details are needed to determine severity and next steps.\"\n}\n\n```\n\n---\n\n### **Example 2: Issue Fully Understood**\n\n**User:** *\"My kitchen sink is leaking. It started yesterday, and I can see water pooling under the cabinet. I tried tightening the pipe, but it still drips.\"*\n\n✅ **Final Response:**\n\n```json\n{\n  \"is_clear\": true,\n  \"is_relevant\": true,\n  \"requires_clarification\": false,\n  \"clarifying_question\": \"\",\n  \"requires_context\": false,\n  \"additional_context_question\": \"\",\n  \"query_summary\": \"User reports a kitchen sink leak that started yesterday. Water is pooling under the cabinet. They attempted to tighten the pipe, but the issue persists.\"\n}\n\n```",
+          "returnIntermediateSteps": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        400,
+        100
+      ],
+      "id": "76e9be32-8694-4cbf-bd3a-9678e33eae3e",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.1,
+      "position": [
+        280,
+        340
+      ],
+      "id": "b35c6402-d69c-492a-82f9-48c6da2ba388",
+      "name": "OpenAI Chat Model5",
+      "credentials": {
+        "openAiApi": {
+          "id": "ALL0POkBXOSPnLjG",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "187a3d5d3eb44c06b2e3154710ca2ae7"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        440,
+        480
+      ],
+      "id": "6424ac99-578a-41cc-9d72-a4e28c032ab6",
+      "name": "Window Buffer Memory"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        180
+      ],
+      "id": "b71bd63b-ed6f-4e72-9713-d30034fe69d0",
+      "name": "Execute Workflow Trigger"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dfd52e57-d37d-46ea-a155-2f081b7e189e",
+              "name": "contract_query",
+              "value": "={{ $json.query }}",
+              "type": "string"
+            },
+            {
+              "id": "670f28c5-64cd-4e1b-a300-c32df0e6a714",
+              "name": "chat_query",
+              "value": "={{ $json.chatInput }}",
+              "type": "string"
+            },
+            {
+              "id": "398b0a63-b28e-4542-8ae3-b218f76b1a77",
+              "name": "",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        200,
+        100
+      ],
+      "id": "603fcd51-142b-4ac9-8931-8cc2f4256f94",
+      "name": "Edit Fields1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model5": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "6d4d8327-9601-4e38-9616-2bb64d3ded30",
+  "meta": {
+    "instanceId": "7b1c8707ef269b2b7256154d3e6b20b34686a82c78626c7b4aea08c3bf3ff55a"
+  },
+  "id": "2k83j88QMlhmJfJj",
+  "tags": []
+}

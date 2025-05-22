@@ -1,0 +1,629 @@
+{
+  "name": "NEW_main_agent",
+  "nodes": [
+    {
+      "parameters": {
+        "public": true,
+        "options": {
+          "responseMode": "responseNode"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -560,
+        -140
+      ],
+      "id": "c147aedd-5416-43b2-8414-7382fbd84ba3",
+      "name": "When chat message received",
+      "webhookId": "c79e88b8-63f7-4721-b655-8aafd4eb221d"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "=***Role\nYou are an expert an expert property management agent acting on behalf of the landlord, to respond to queries that tenants have and take actions where appropriate. You must use your expertise, as well as the tools at your disposal to consider the context of the query, assessed severity/urgency, contractual position (if applicable), and then respond in the most helpful and friendly manner whilst respecting your legal obligation as a (stand in) landlord. \n\n\n***Tools\n*ContextAgent: *always* Call this tool as your first step, to check if more context or clarification is required\n*contractAgent - Used to check the contractual position on a tenants query\n*classifierAgent - Used to verify the level of urgency and advisable next steps\n\nRemember, tools give valuable new information which will help you to provide the best response possible, make use of them as much as you can.\n\n***Instructions\nStep 1: ALWAYS pass an up-to-date summary of the users query, directly to the ContextAgent tool and wait for the response. NEVER SKIP THIS STEP. You must not skip this step else you will fail. Check the Human/AI conversation history to generate a good summary to pass to the ContextAgent tool.\nALWAYS pass an up-to-date summary of the user's query to the ContextAgent tool and wait for the response. NEVER SKIP THIS STEP.\n- If the response contains a clarifying question, output this clarifying question to the user and wait for their response.\n- If the response contains an additional_context_question, output this additional context question to the user and wait for their response.\n-After receiving a response from the user, send the updated query summary back to the ContextAgent again.\nRepeat this process until the ContextAgent confirms that no further clarification or context is required.\n-Only then proceed to Step 2.\n\n- Step 2:\nUsing the summary of the tenant query, convert it into a concise vector search query\n\nThe query should be short, use only relevant keywords, and exclude unnecessary words.\n\nExample good search query: \"pet policy rental agreement\"\n\nExample bad search query: \"What does my rental agreement say about pets?\"\n\n- Step 3: Send the vector search query to the contractTool\n\n- Step 4: Send the vector search query to the classifierTool\n\n- Step 5: Use the returned information from both contractTool and classifierTool to make an informed decision on how best to respond to the user.\n\n- *Important\nyou are attempting to help the user resolve their problem, but are representing the landlord. Therefore, you must speak in the voice of the landlord, upholding and fulfilling your duties where required to do so according to the contract and generally accepted practices between tenant/landlord relationships.\n\nYou may recommend a course of action to be taken on the landlords behalf, such as contacting a plumber, electrician, or any other profession typically employed to resolve tenancy issues. If you deem that this is required, CLEARLY STATE that this is what you will do in your response\n\nFinally, NEVER tell the user to communicate with the landlord. YOU ARE the stand-in landlord, therefore telling them to do so is non-sensical. \n\n- **Tone \nHelpful, friendly, but professional\n\n- **Output examples\n\nExample 1\n\nUser summary: User has a persistent issue with mould and has attempted to remove the mould to no avail.\n\ncontractTool: The landlord is responsible for general upkeep and making the tenancy livable\n\nclassifierTool: Mould is classed as an arguent issue as there are potential risks to the tenants health\n\nYour Response: \"Based on what you've told me, the contract states this issue is now the responsibility of the landlord and should be handled urgently. The landlord will be informed and I will arrange to have an expert sent round to investigate the issue and help you resolve it.\n\nExample 2\n\nUser summary: There is a leaking roof that is causing water to drip into the tenant's bedroom. The tenant tried patching it with sealant but the leak remains.\n\ncontractTool: Landlord is responsible for maintaining the structure and exterior of the property, including the roof.\n\nclassifierTool: This issue is high urgency due to the potential for ongoing damage to the property and health/safety risks (e.g., mold, structural concerns).\n\nYour Response: "According to your tenancy agreement, I'm responsible for keeping the roof in good repair to protect your living space. This sounds urgent, so I'll notify the landlord immediately and arrange to have a professional roofer inspect and repair the leak as soon as possible. Thank you for letting us know."\n\nExample 3\n\nUser summary: The heating system is not working properly, and the tenant has no hot water or heating. They have tried resetting the boiler with no success.\n\ncontractTool: The landlord's contractual obligations include providing a functioning heating and hot water system.\n\nclassifierTool: Heating and hot water issues are considered urgent, especially if outside temperatures are low or it affects habitability.\n\nYour Response:\n"I understand you have no heating or hot water, and that's a serious concern. Under the rental agreement, the landlord is responsible for providing and maintaining a working heating system. I'll inform the landlord right away and arrange for a certified technician to come out and fix the issue as quickly as possible."\n\nExample 4\n\nUser summary: Tenant would like to add decorations to the apartment and need to drill holes\n\ncontractTool: The tenant must receive permission from the landlord before doing any decorative work. The tenant must also return the apartment to a normal state afterwards\n\nclassifierTool: Decorations and internal modifications are low risk with no immediate action required, other than to seek permission from the landlord\n\nYour Response: "Hanging your own decorations is permitted but only once permission from the landlord is sought. If you give me the full details of what you wish to hang up, I will request permission from the landlord for you. Thank you for keeping us updated."\n\nNow Begin!",
+          "returnIntermediateSteps": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        -160,
+        -40
+      ],
+      "id": "702e0fa9-6d8c-40b2-966d-b2f021c9126f",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.1,
+      "position": [
+        -280,
+        200
+      ],
+      "id": "e5679035-69ca-445a-9a90-527abc3f8a05",
+      "name": "OpenAI Chat Model5",
+      "credentials": {
+        "openAiApi": {
+          "id": "ALL0POkBXOSPnLjG",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "187a3d5d3eb44c06b2e3154710ca2ae7"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -280,
+        460
+      ],
+      "id": "8a566528-a0da-45e2-a1e9-0216bf8bebb9",
+      "name": "Window Buffer Memory"
+    },
+    {
+      "parameters": {
+        "name": "ContextAgent",
+        "description": "Call this agent to get more context on the question",
+        "workflowId": {
+          "__rl": true,
+          "value": "2k83j88QMlhmJfJj",
+          "mode": "list",
+          "cachedResultName": "Abodient.ai — ContextAgent"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -140,
+        340
+      ],
+      "id": "b60640f6-09fa-4390-8b43-1e6fab3be133",
+      "name": "Context_agent"
+    },
+    {
+      "parameters": {
+        "name": "classifierAgent",
+        "description": "Call this tool to understand the level of urgency of the query",
+        "workflowId": {
+          "__rl": true,
+          "value": "m9dQYhTLF14LDJxx",
+          "mode": "list",
+          "cachedResultName": "Abodient.ai — classifierAgent"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        160,
+        340
+      ],
+      "id": "4a050171-cb73-47cc-95b0-6ce5bbc02ce3",
+      "name": "Classifier_agent"
+    },
+    {
+      "parameters": {
+        "name": "contractAgent",
+        "description": "Call this tool to get the contractual position on the current query",
+        "workflowId": {
+          "__rl": true,
+          "value": "CFhz5w3gPYuhHsru",
+          "mode": "list",
+          "cachedResultName": "Abodient.ai — contractAgent"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        340
+      ],
+      "id": "19f83f83-285e-4f87-abcb-06ffaa54d516",
+      "name": "Contract_agent"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.output }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=Turn the input into a structured JSON output. \"chat_output\" is the chat input you receive, \"Query_summary\" summarises the input (string), \"actions\" summarises the actions mentioned in the input. If there is no discernible action mentioned in the input, then leave \"actions\" blank.\n\nExample:\nInput:\nI understand that the hot water system is not working at all, and this is indeed a serious concern as it can greatly affect your day-to-day life. According to your rental agreement, it's the landlord's responsibility to ensure that the hot water system is functioning properly.\\n\\nI will notify the landlord right away and arrange for a qualified plumber to come out and fix the issue as soon as possible. Thank you for bringing this to our attention, and I appreciate your patience while we work to resolve it.\n\nJSON output:\n{\"chat_output\": \"I understand that the hot water system is not working at all, and this is indeed a serious concern as it can greatly affect your day-to-day life. According to your rental agreement, it's the landlord's responsibility to ensure that the hot water system is functioning properly.\\n\\nI will notify the landlord right away and arrange for a qualified plumber to come out and fix the issue as soon as possible. Thank you for bringing this to our attention, and I appreciate your patience while we work to resolve it.\",\n\"query_summary\": \"Hot water not working, high risk to tenant, landlords responsibility to fix\",\n\"actions\": [\"Notify landlord that the hot water is broken and that a plumber has been contacted\", \"Arrange for plumber to fix the hot water issue\"]\n}\n\n**Important\nWhen defining the \"actions\", make sure you detail what the actions are for, in the context. Do not arrange for 2 technicians to come if they are both to fix the same problem, just pick the most suitable one"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.5,
+      "position": [
+        240,
+        -40
+      ],
+      "id": "529ee193-4a50-468b-80c9-91a079a6d7bf",
+      "name": "Basic LLM Chain",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.1,
+      "position": [
+        280,
+        160
+      ],
+      "id": "eab725d9-7639-4ab1-9b4b-c154df4a63f1",
+      "name": "OpenAI Chat Model2",
+      "credentials": {
+        "openAiApi": {
+          "id": "ALL0POkBXOSPnLjG",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"chat_output\": \"<Input chat received>\", \n  \"query_summary\": \"Hot water not working, high risk to tenant, landlords responsibility to fix\",\n    \"actions\": [\"Notify landlord\", \"Arrange for plumber to fix\"]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        500,
+        220
+      ],
+      "id": "526c2c52-c9a9-4018-a9a2-cb0c17c7caf1",
+      "name": "Structured Output Parser1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3a274c36-7a18-41f5-8815-80e74b460d69",
+              "name": "output",
+              "value": "={{ $json.output.chat_output }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        800,
+        160
+      ],
+      "id": "4eb1ba9a-e7ec-4935-b157-1a1c5f96e29f",
+      "name": "Chat output"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3a274c36-7a18-41f5-8815-80e74b460d69",
+              "name": "Actions",
+              "value": "={{ $json.output.actions }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        960,
+        -160
+      ],
+      "id": "23878b80-a9cd-4497-a2ed-657a5923aee8",
+      "name": "Actions"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://samirszamocki.app.n8n.cloud/webhook-test/159d84bd-45f5-43fb-9be9-9f8bc2ed6653",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "Actions",
+              "value": "={{ $json.Actions }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1280,
+        -200
+      ],
+      "id": "2691ed20-70c7-4d66-a3ed-08926435bfb5",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2f07d90b-1ebf-49fa-972c-3e3439c4a74f",
+              "name": "output.actions",
+              "value": "={{ $json.output.actions }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        960,
+        -420
+      ],
+      "id": "c1a769e9-b150-43ce-bd2f-e41e1712443b",
+      "name": "Pinned_Mock_action_data"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c2d9f195-526d-43e5-9031-160eec4cc5d1",
+              "leftValue": "={{ $json.output.actions }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        600,
+        -120
+      ],
+      "id": "d4e094a2-3ff6-44a2-ab10-afeb8ae50317",
+      "name": "If"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        820,
+        -20
+      ],
+      "id": "0aa8e816-f9b0-4063-94d7-6dfc335250f6",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1500,
+        -200
+      ],
+      "id": "785decce-87f1-43e6-adeb-1c966c756acb",
+      "name": "No Operation, do nothing1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1040,
+        160
+      ],
+      "id": "0ff76aef-4ab5-4f1d-94d2-208720d0f167",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {},
+      "id": "af194b9b-656e-4956-a8b2-afb5a6a5437e",
+      "name": "When clicking \"Execute Workflow\"",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -120,
+        -540
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "execution",
+        "returnAll": true,
+        "filters": {
+          "workflowId": {
+            "__rl": true,
+            "value": "255",
+            "mode": "list",
+            "cachedResultName": "RSS to Slack (#255)"
+          },
+          "status": "error"
+        },
+        "options": {
+          "activeWorkflows": false
+        },
+        "requestOptions": {}
+      },
+      "id": "e9263446-2fac-44c3-9a77-5a6c87aa7051",
+      "name": "n8n",
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        120,
+        -520
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "toFile",
+        "fileFormat": "csv",
+        "options": {
+          "headerRow": true
+        }
+      },
+      "id": "5ab37a3a-abe0-415f-bd47-1662b4963297",
+      "name": "Spreadsheet File",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 1,
+      "position": [
+        280,
+        -540
+      ]
+    }
+  ],
+  "pinData": {
+    "Pinned_Mock_action_data": [
+      {
+        "json": {
+          "output": {
+            "actions": [
+              "Notify landlord about the slippery tiles issue",
+              "Recommend using non-slip mats as a temporary safety measure",
+              "Arrange for a maintenance inspection to address the slippery tiles"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model5": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Context_agent": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classifier_agent": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contract_agent": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Chat output",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Actions": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat output": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinned_Mock_action_data": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Actions",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking \"Execute Workflow\"": {
+      "main": [
+        [
+          {
+            "node": "n8n",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "n8n": {
+      "main": [
+        [
+          {
+            "node": "Spreadsheet File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "574921bb-4c9a-495d-8fa8-46595d7116ca",
+  "meta": {
+    "instanceId": "7b1c8707ef269b2b7256154d3e6b20b34686a82c78626c7b4aea08c3bf3ff55a"
+  },
+  "id": "7J7hZ0KG0bKdYLKa",
+  "tags": []
+}

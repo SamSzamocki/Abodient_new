@@ -1,0 +1,511 @@
+{
+  "name": "contractAgent",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.file_url }}",
+          "mode": "url"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -800,
+        40
+      ],
+      "id": "f73816cd-4b43-4b8d-985b-6bb00581a607",
+      "name": "Google Drive",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "47wlM5QnLadtvbd3",
+          "name": "Google Drive account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "contract-search",
+          "mode": "id"
+        },
+        "options": {
+          "pineconeNamespace": "contract-1"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1,
+      "position": [
+        -580,
+        40
+      ],
+      "id": "1f61ee57-5214-47d1-8a03-98dc3e68a493",
+      "name": "Pinecone Vector Store1",
+      "credentials": {
+        "pineconeApi": {
+          "id": "v4w5XqM4uPeoujxm",
+          "name": "PineconeApi account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -540,
+        260
+      ],
+      "id": "15a85def-e1c3-4ab9-a69b-99ae9d3b2e0f",
+      "name": "Embeddings OpenAI1",
+      "credentials": {
+        "openAiApi": {
+          "id": "ALL0POkBXOSPnLjG",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataType": "binary",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1,
+      "position": [
+        -440,
+        260
+      ],
+      "id": "70ae4919-0826-4276-8698-71d332e6acad",
+      "name": "Default Data Loader"
+    },
+    {
+      "parameters": {
+        "chunkOverlap": 100,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        -420,
+        440
+      ],
+      "id": "26c69d30-6bd1-4969-8ff6-0df61beb97a3",
+      "name": "Recursive Character Text Splitter"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d56e531f-1552-46d3-95ef-20da7399f131",
+              "name": "file_url",
+              "value": "https://drive.google.com/file/d/1eU4Cw89XRe9vsz_S8EzsUZcquBV_QEOc/view?usp=drive_link",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1060,
+        40
+      ],
+      "id": "c59daf0c-8168-40d5-b14f-39d8b2e14224",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1260,
+        40
+      ],
+      "id": "49ac121d-c39f-4e6d-ab8c-923690e36a7e",
+      "name": "When clicking ‘Test workflow’"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        0
+      ],
+      "id": "bdd90eab-60d6-4ed7-9bc2-d50b48bfa156",
+      "name": "Execute Workflow Trigger",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dfd52e57-d37d-46ea-a155-2f081b7e189e",
+              "name": "contract_query",
+              "value": "={{ $json.query }}",
+              "type": "string"
+            },
+            {
+              "id": "670f28c5-64cd-4e1b-a300-c32df0e6a714",
+              "name": "chat_query",
+              "value": "={{ $json.chatInput }}",
+              "type": "string"
+            },
+            {
+              "id": "398b0a63-b28e-4542-8ae3-b218f76b1a77",
+              "name": "",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        140,
+        0
+      ],
+      "id": "b8b3ea2a-fa15-46f0-89c5-0447e4360cdf",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -40,
+        180
+      ],
+      "id": "ce12d133-0e6f-4e38-a286-118942dc2ae2",
+      "name": "When chat message received",
+      "webhookId": "86585911-c4a3-4509-8d43-3b59a8886e06"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.contract_query }}{{ $json.chat_query }}",
+        "options": {
+          "systemMessage": "=You are an expert in analysing tenancy contracts to help answer user queries. \n\nAvailable tool\n-contractInformation\n\nInstructions\nUse contractInformation tool to find relevant contractual information related to the query. \n\nTasks\n1) understand the intent of the query and 2) subsequently turn this into an efficient vector search query which you must pass to contractInformation tool\n\nOutput\nYour response to a query must include the full contractual position, clear stating the relevant section of the contract, and provide as much relevant information as you can to help answer the query.\n\nYour tone must be helpful, clear and friendly\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        540,
+        20
+      ],
+      "id": "15d10530-ab50-4ba5-904f-680756f8eced",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "name": "contractInformation",
+        "description": "Returns relevant contractual information related to the query",
+        "topK": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
+      "typeVersion": 1,
+      "position": [
+        740,
+        280
+      ],
+      "id": "1b132b3f-b78a-4a1a-a069-1e91f7919121",
+      "name": "Vector Store Tool"
+    },
+    {
+      "parameters": {
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "contract-search",
+          "mode": "list",
+          "cachedResultName": "contract-search"
+        },
+        "options": {
+          "pineconeNamespace": "contract-1"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1,
+      "position": [
+        700,
+        440
+      ],
+      "id": "13ceb4f1-709a-44ea-9087-ebfb688ba43f",
+      "name": "Pinecone Vector Store2",
+      "credentials": {
+        "pineconeApi": {
+          "id": "v4w5XqM4uPeoujxm",
+          "name": "PineconeApi account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        780,
+        600
+      ],
+      "id": "31623215-bf04-4de2-8e64-5cba1889b9fa",
+      "name": "Embeddings OpenAI2",
+      "credentials": {
+        "openAiApi": {
+          "id": "ALL0POkBXOSPnLjG",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "options": {
+          "responseFormat": "text"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.1,
+      "position": [
+        1000,
+        400
+      ],
+      "id": "0a60ba49-3bef-42bf-9500-1b14233840be",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "ALL0POkBXOSPnLjG",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.1,
+      "position": [
+        420,
+        240
+      ],
+      "id": "9b66cc7e-b36f-431e-bea3-f0d13d74280b",
+      "name": "OpenAI Chat Model2",
+      "credentials": {
+        "openAiApi": {
+          "id": "ALL0POkBXOSPnLjG",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "Take from previous node automatically"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        580,
+        240
+      ],
+      "id": "7ce04324-c0d9-4d96-923a-54f985a137cb",
+      "name": "Window Buffer Memory"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Drive": {
+      "main": [
+        [
+          {
+            "node": "Pinecone Vector Store1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone Vector Store1",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Pinecone Vector Store1",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Google Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinecone Vector Store2": {
+      "ai_vectorStore": [
+        [
+          {
+            "node": "Vector Store Tool",
+            "type": "ai_vectorStore",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI2": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone Vector Store2",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Vector Store Tool",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vector Store Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "any"
+  },
+  "versionId": "bc1c3af6-84cd-4531-9f99-4357e33d5278",
+  "meta": {
+    "instanceId": "7b1c8707ef269b2b7256154d3e6b20b34686a82c78626c7b4aea08c3bf3ff55a"
+  },
+  "id": "CFhz5w3gPYuhHsru",
+  "tags": []
+}
