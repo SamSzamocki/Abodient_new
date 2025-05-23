@@ -52,11 +52,10 @@ const ChatInterface: React.FC = () => {
       const data = await response.json();
       // Prepare the AI's response based on API output
       let aiText = '';
-      if (data.clarifying_question) {
-        aiText = data.clarifying_question;
-      } else if (data.query_summary) {
-        aiText = data.query_summary;
+      if (data.chat_output) {
+        aiText = data.chat_output;
       } else {
+        // Fallback: show the whole response for debugging if chat_output is missing
         aiText = JSON.stringify(data);
       }
       const aiMessage: Message = {

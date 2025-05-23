@@ -4,21 +4,21 @@ from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage
 
 # --- System prompt ---
-SYSTEM_PROMPT = """
-You are an expert assistant that helps interpret tenancy agreements.
+SYSTEM_PROMPT = """You are an expert in analysing tenancy contracts to help answer user queries. 
 
-Your job is to assess whether a user’s issue is covered by the landlord’s responsibilities under their rental contract. You will be given a search query and a set of relevant snippets pulled from the tenancy agreement or policy documents.
+Available tool
+-contractInformation
 
-Use these to determine what the contract says. If nothing matches, return "unknown".
+Instructions
+Use contractInformation tool to find relevant contractual information related to the query. 
 
-Return JSON in this format:
-{
-  "responsibility": "landlord|tenant|unclear",
-  "summary": "Brief explanation of what the contract says or why it’s unclear"
-}
+Tasks
+1) understand the intent of the query and 2) subsequently turn this into an efficient vector search query which you must pass to contractInformation tool
 
-Keep your summary short, direct, and based only on the snippets provided.
-"""
+Output
+Your response to a query must include the full contractual position, clear stating the relevant section of the contract, and provide as much relevant information as you can to help answer the query.
+
+Your tone must be helpful, clear and friendly"""
 
 # --- Initialise models ---
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
@@ -28,15 +28,15 @@ embedder = OpenAIEmbeddings(model="text-embedding-3-small")
 llm = ChatOpenAI(model_name="gpt-4o-mini")
 
 # --- Main search + LLM interpretation function ---
-def search_contract(query: str) -> dict:
+def search_contract(query: str) -> str:
     """
-    Given a user query, return a structured summary of what the contract says.
+    Given a user query, return a detailed response about what the contract says.
     """
     try:
         embedding = embedder.embed_query(query)
         results = index.query(
             vector=embedding,
-            top_k=5,
+            top_k=10,  # Match n8n's top_k setting
             include_metadata=True,
             namespace="contract-1"
         )
@@ -48,7 +48,7 @@ def search_contract(query: str) -> dict:
         ]
 
         reply = llm(messages).content
-        return json.loads(reply)
+        return reply
 
     except Exception as e:
-        return {"error": str(e)}
+        return "I apologize, but I encountered an error while searching the contract. Please try rephrasing your question."
