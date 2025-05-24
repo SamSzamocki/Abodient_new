@@ -23,7 +23,7 @@ langfuse_handler = CallbackHandler(
     host="https://cloud.langfuse.com"
 )
 
-llm = ChatOpenAI(model_name="gpt-3.5-turbo")
+llm = ChatOpenAI(model_name="gpt-4o-mini")
 
 def handle_message(db, session_id: str, text: str, history=None) -> dict:
     """

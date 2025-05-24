@@ -70,7 +70,7 @@ async def main_agent_ep(item: TextItem, db: Session = Depends(get_db), api_key: 
         secret_key="sk-lf-06a5516a-d683-44d4-b2b2-418ad43429f3",
         host="https://cloud.langfuse.com"
     )
-    llm = ChatOpenAI(model_name="gpt-3.5-turbo")
+    llm = ChatOpenAI(model_name="gpt-4o-mini")
     response = llm.invoke(item.text, config={"callbacks": [langfuse_handler]})
     
     # Store AI response

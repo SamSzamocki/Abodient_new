@@ -8,7 +8,7 @@ langfuse_handler = CallbackHandler(
     host="https://cloud.langfuse.com"
 )
 
-llm = ChatOpenAI(model_name="gpt-3.5-turbo")  # or "gpt-4o" if you have access
+llm = ChatOpenAI(model_name="gpt-4o-mini")  # or "gpt-4o" if you have access
 
 prompt = "Say hello from Langfuse test!"
 
