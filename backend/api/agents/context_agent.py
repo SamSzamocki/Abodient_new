@@ -1,8 +1,16 @@
 import os, json
 from langchain_openai import ChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage
+from langchain.memory import ConversationBufferMemory
+from langfuse.callback import CallbackHandler
 
 llm = ChatOpenAI(model_name="gpt-4o-mini")
+langfuse_handler = CallbackHandler(
+    public_key="pk-lf-d9a88b84-cdab-44eb-bada-98f2c8567ab7",
+    secret_key="sk-lf-06a5516a-d683-44d4-b2b2-418ad43429f3",
+    host="https://cloud.langfuse.com"
+)
+session_memories = {}
 
 SYSTEM_PROMPT = """
 You are an expert at assessing questions from tenants in the real estate space.
@@ -142,14 +150,29 @@ IMPORTANT:
 """
 
 def run_context_agent(text: str) -> dict:
-    """Evaluate clarity, relevance, and context for a tenant query."""
+    """Evaluate clarity, relevance, and context for a tenant query. Strictly enforce output keys."""
+    required_keys = [
+        "is_clear",
+        "is_relevant",
+        "requires_clarification",
+        "clarifying_question",
+        "requires_context",
+        "additional_context_question",
+        "query_summary",
+        "response"
+    ]
     try:
         messages = [
             SystemMessage(content=SYSTEM_PROMPT),
             HumanMessage(content=text),
         ]
-        reply = llm(messages).content
-        return json.loads(reply)
+        reply = llm.invoke(messages, config={"callbacks": [langfuse_handler]})
+        parsed = json.loads(reply.content)
+        # Only keep required keys, fill missing with defaults
+        result = {}
+        for key in required_keys:
+            result[key] = parsed.get(key, "" if key != "is_clear" and key != "is_relevant" and key != "requires_clarification" and key != "requires_context" else False)
+        return result
     except Exception as e:
         return {
             "is_clear": False,

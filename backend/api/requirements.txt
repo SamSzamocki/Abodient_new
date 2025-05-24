@@ -12,3 +12,6 @@ google-auth-httplib2>=0.1.0  # For Google authentication
 google-auth-oauthlib>=0.4.0  # For Google OAuth
 python-multipart  # For handling file uploads
 aiofiles  # For async file operations
+psycopg2-binary  # PostgreSQL adapter for Python
+sqlalchemy  # SQL toolkit and ORM
+langfuse
