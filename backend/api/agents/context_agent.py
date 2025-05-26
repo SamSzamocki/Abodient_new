@@ -1,186 +1,198 @@
 import os, json
 from langchain_openai import ChatOpenAI
+from langchain.memory import ConversationBufferWindowMemory
 from langchain.schema import HumanMessage, SystemMessage
-from langchain.memory import ConversationBufferMemory
-from langfuse.callback import CallbackHandler
+from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.prompts import PromptTemplate
+from pydantic import BaseModel, Field
+from typing import Optional
 
-llm = ChatOpenAI(model_name="gpt-4o-mini")
-langfuse_handler = CallbackHandler(
-    public_key="pk-lf-d9a88b84-cdab-44eb-bada-98f2c8567ab7",
-    secret_key="sk-lf-06a5516a-d683-44d4-b2b2-418ad43429f3",
-    host="https://cloud.langfuse.com"
-)
+# Define the expected response structure
+class ContextResponse(BaseModel):
+    is_clear: bool = Field(description="Whether the question is clear")
+    is_relevant: bool = Field(description="Whether the question is relevant to tenancy")
+    requires_clarification: bool = Field(description="Whether clarification is needed")
+    clarifying_question: str = Field(description="The clarifying question to ask", default="")
+    requires_context: bool = Field(description="Whether additional context is needed")
+    additional_context_question: str = Field(description="The context question to ask", default="")
+    query_summary: str = Field(description="Summary of the user's issue")
+
+# Create output parser
+parser = JsonOutputParser(pydantic_object=ContextResponse)
+
+# LLM configuration matching n8n
+llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0)
+
+# Shared memory storage - matches n8n's shared session key
 session_memories = {}
 
-SYSTEM_PROMPT = """
-You are an expert at assessing questions from tenants in the real estate space.
-Your role is to:
+def get_shared_memory(session_id: str = "187a3d5d3eb44c06b2e3154710ca2ae7") -> ConversationBufferWindowMemory:
+    """
+    Get shared memory - matches n8n's Window Buffer Memory configuration
+    """
+    if session_id not in session_memories:
+        session_memories[session_id] = ConversationBufferWindowMemory(
+            k=5,  # Window size
+            memory_key="chat_history",
+            return_messages=True
+        )
+    return session_memories[session_id]
 
-1. Evaluate whether the user's question is clear and relevant to a tenant–landlord context.
-2. If it is not clear or possibly irrelevant, you must ask a clarifying question once.
-3. If the user then confirms that it is indeed about their tenancy, you must treat the query as relevant going forward. Avoid repeating the same clarifying question once the user has confirmed relevance or clarity.
-4. Once the question is clear and relevant, assess if you have enough info to diagnose or route the issue. If not, ask UP TO TWO context gathering questions which aim to establish new and useful information for someone aiming to help resolve the issue quickly. This context gathering question should NEVER ask the user if they have checked the lease.
+# EXACT system prompt from n8n ContextAgent.json with structured output instructions
+SYSTEM_PROMPT = """### **Role**
 
-Your **only** goal is to generate a response in **structured JSON** format:
+You are an expert at ensuring tenant queries contain all the necessary context to facilitate a resolution. Your goal is to assess each query and gather sufficient **clarifying** and **contextual** information before marking it as complete.
 
-{
-"is_clear": <true|false>,
-"is_relevant": <true|false>,
-"requires_clarification": <true|false>,
-"clarifying_question": "",
-"requires_context": <true|false>,
-"additional_context_question": "",
-"query_summary": "A summary of what they're asking + any useful additional context.",
-"response": "A natural language response to the user that includes any clarifying or context gathering questions."
-}
+### **Your Responsibilities:**
 
-### Detailed Instructions
+For each tenant query, follow these steps:
 
-**Step 1: Assess the User Query + Conversation History for clarity and relevance**
+1. **Determine if the question is clear and relevant to a tenancy issue.**
+    - If unclear or possibly unrelated, ask **one clarifying question** to confirm intent.
+    - If the user confirms relevance, proceed as if it was always relevant.
+2. **Always gather sufficient context before finalizing the response.**
+    - No issue should be considered **fully understood** unless the following key facts have been collected:
+        - **What**: What is the exact problem? (e.g., is something broken, missing, malfunctioning?)
+        - **Where**: Where is this happening? (e.g., which room, which part of the property?)
+        - **When**: When did the issue start? Has it worsened over time?
+        - **How**: How is the issue affecting the tenant? Can they still use the affected item?
+        - **Attempts at Resolution**: Has the tenant tried any solutions themselves? If so, what were the results?
+3. **Format your response in structured JSON, ensuring all necessary information is gathered before finalizing.**
 
-- Identify the underlying **intent** of the user's question or conversation from the last several turns.
-- Determine:
-    - **Clarity**: Is the request unambiguous or does it lack details?
-    - **Relevance**: Does it relate to their tenancy (e.g. repairs, payments, rules in their lease, general property questions)?
+---
 
-If the question is **unclear or irrelevant**:
+### **Response Format**
 
-- Set is_clear = false or is_relevant = false, as appropriate.
-- Proceed to **Step 2**.
+Your response must strictly follow this JSON structure:
 
-If the question is obviously about a tenancy issue:
+```json
+{{
+  "is_clear": true|false,
+  "is_relevant": true|false,
+  "requires_clarification": true|false,
+  "clarifying_question": "",
+  "requires_context": true|false,
+  "additional_context_question": "",
+  "query_summary": "A summary of the user's issue, incorporating all gathered details."
+}}
+```
 
-- Set is_clear = true, is_relevant = true, requires_clarification = false.
+### **Response Rules:**
 
-If the question is clear and relevant but lacks some key contextual information:
+- If the **question is unclear** → Ask a **clarifying question** before proceeding.
+- If the **question lacks full context** → **Ask additional context-gathering questions** to establish all key facts.
+- Only when the **what, where, when, how, and any prior attempts** are fully known can you consider the query fully understood.
+- Never repeat the same clarification once the user has confirmed relevance.
+- Never assume context unless explicitly stated by the tenant.
 
-- Set is_clear = true, is_relevant = true, requires_clarification = false, requires_context = true.
-- Proceed to **Step 3**
+---
 
-**Step 2: Ask for Clarification (If Needed)**
+### **Examples**
 
-- If the question is ambiguous or it's not obviously related to tenancy, generate **one** clarifying question.
-- Format it in the style:
-"You've asked about X. My understanding is Y, can you verify?"
-- Then set "requires_clarification": true.
+### **Example 1: Missing Context**
 
-**Important**:
+**User:** *"My lock is broken."*
 
-- Once the user confirms that it **is** about their tenancy or clarifies the question, **stop** repeating clarifications. Update your response to show clarity/relevance based on the new information.
-- If the user only says "Yes" or "That's correct," and your conversation context implies they've confirmed it's about their property, interpret this as **relevant**.
-- If the user's last message provides no new question but reaffirms the same point, produce a final JSON indicating the updated state (e.g. "is_clear": true, "is_relevant": true, etc.).
+🚫 **Incorrect Response:**
 
-**Step 3: Gather more context (If Needed)**
+```json
+{{
+  "is_clear": true,
+  "is_relevant": true,
+  "requires_clarification": false,
+  "clarifying_question": "",
+  "requires_context": false,
+  "additional_context_question": "",
+  "query_summary": "User states their lock is broken."
+}}
+```
 
-- "Context gathering" is about gathering details needed to handle a relevant, but incomplete, question.
-- If the query lacks context which might be useful to helping resolve the query, generate **one** context gathering question linked to the query. Example questions could focus on when it occurred, where, how, what the tenant has done to resolve the issue already, context specific questions etc. NEVER ask the user if they've checked the lease terms.
+❌ **Problem:** This fails to collect necessary details (e.g., which lock, whether they can still enter, whether they've tried anything).
 
-- Important: You are the acting landlord, therefore NEVER ask the tenant if they've reported it to the landlord, that would be non-sensical.
-- Provide a summary of the tenant query and gathered context in "query_summary".
+✅ **Correct Response:**
 
-### Examples
+```json
+{{
+  "is_clear": true,
+  "is_relevant": true,
+  "requires_clarification": false,
+  "clarifying_question": "",
+  "requires_context": true,
+  "additional_context_question": "Which lock is broken? Are you currently unable to lock or unlock your door? When did the issue start? Have you tried anything to fix it?",
+  "query_summary": "User reports a broken lock but more details are needed to determine severity and next steps."
+}}
+```
 
-**User**: "I'm looking for the address of my house."
+---
 
-{
-"is_clear": true,
-"is_relevant": true,
-"requires_clarification": false,
-"clarifying_question": "",
-"requires_context": false,
-"additional_context_question": "",
-"query_summary": "User wants the address of their rental property.",
-"response": "I can help you with that. What is your unit number or apartment name?"
-}
+### **Example 2: Issue Fully Understood**
 
-**User**: "Hey, what's the weather like?"
+**User:** *"My kitchen sink is leaking. It started yesterday, and I can see water pooling under the cabinet. I tried tightening the pipe, but it still drips."*
 
-{
-"is_clear": false,
-"is_relevant": false,
-"requires_clarification": true,
-"clarifying_question": "You've asked about the weather. Are you asking about your property's conditions or something related to your tenancy? Please clarify.",
-"requires_context": false,
-"additional_context_question": "",
-"query_summary": "",
-"response": "You've asked about the weather. Are you asking about your property's conditions or something related to your tenancy? Please clarify."
-}
+✅ **Final Response:**
 
-**User**: "My lights have stopped working."
+```json
+{{
+  "is_clear": true,
+  "is_relevant": true,
+  "requires_clarification": false,
+  "clarifying_question": "",
+  "requires_context": false,
+  "additional_context_question": "",
+  "query_summary": "User reports a kitchen sink leak that started yesterday. Water is pooling under the cabinet. They attempted to tighten the pipe, but the issue persists."
+}}
+```
 
-{
-"is_clear": true,
-"is_relevant": true,
-"requires_clarification": false,
-"clarifying_question": "",
-"requires_context": true,
-"additional_context_question": "Have you tried checking your circuit breaker or replacing the light bulbs? Is it just one room or the entire unit?",
-"query_summary": "User reports non-functional lights; needs more info to diagnose whether it's a small fix or a wider outage.",
-"response": "I understand your lights aren't working. To help diagnose the issue, could you tell me if you've tried checking your circuit breaker or replacing the light bulbs? Also, is it just one room or the entire unit?"
-}
-
-**User**: "There's water on my kitchen floor."
-
-{
-"is_clear": true,
-"is_relevant": true,
-"requires_clarification": false,
-"clarifying_question": "",
-"requires_context": true,
-"additional_context_question": "Is the water coming from a pipe under the sink, the ceiling, or somewhere else? Has this been happening regularly or just started?",
-"query_summary": "User reports water in the kitchen; more info is needed to diagnose if it's a plumbing leak or another source.",
-"response": "I understand there's water on your kitchen floor. To help address this quickly, could you tell me if the water is coming from a pipe under the sink, the ceiling, or somewhere else? Also, has this been happening regularly or did it just start?"
-}
-
-IMPORTANT: 
-
-- Always produce the final answer in **one** JSON object, e.g.:
-{
-"is_clear": false,
-"is_relevant": false,
-"requires_clarification": true,
-"clarifying_question": "",
-"requires_context": false,
-"additional_context_question": "",
-"query_summary": "",
-"response": ""
-}
-- Do not include additional text outside the JSON. Adhere strictly to the keys above.
-- Use the context of the human / AI interaction if available to establish what the user's intentions are. If the user has already confirmed the question is relevant and you have enough clarity, do not keep asking for clarifications. Provide the final JSON accordingly.
+{format_instructions}
 """
 
-def run_context_agent(text: str) -> dict:
-    """Evaluate clarity, relevance, and context for a tenant query. Strictly enforce output keys."""
-    required_keys = [
-        "is_clear",
-        "is_relevant",
-        "requires_clarification",
-        "clarifying_question",
-        "requires_context",
-        "additional_context_question",
-        "query_summary",
-        "response"
-    ]
+def run_context_agent(query: str, session_id: str = "187a3d5d3eb44c06b2e3154710ca2ae7") -> dict:
+    """
+    Context agent that matches n8n ContextAgent.json structure exactly
+    """
+    print(f"[CONTEXT AGENT] Processing query: {query}")
+    
     try:
-        messages = [
-            SystemMessage(content=SYSTEM_PROMPT),
-            HumanMessage(content=text),
-        ]
-        reply = llm.invoke(messages, config={"callbacks": [langfuse_handler]})
-        parsed = json.loads(reply.content)
-        # Only keep required keys, fill missing with defaults
-        result = {}
-        for key in required_keys:
-            result[key] = parsed.get(key, "" if key != "is_clear" and key != "is_relevant" and key != "requires_clarification" and key != "requires_context" else False)
+        # Get shared memory
+        memory = get_shared_memory(session_id)
+        
+        # Create prompt template with format instructions
+        prompt = PromptTemplate(
+            template=SYSTEM_PROMPT + "\n\nUser Query: {query}",
+            input_variables=["query"],
+            partial_variables={"format_instructions": parser.get_format_instructions()}
+        )
+        
+        # Build the chain: prompt -> llm -> parser
+        chain = prompt | llm | parser
+        
+        # Load conversation history for context (but don't include in the main prompt)
+        try:
+            memory_vars = memory.load_memory_variables({})
+            if "chat_history" in memory_vars and memory_vars["chat_history"]:
+                print(f"[CONTEXT AGENT] Loaded {len(memory_vars['chat_history'])} messages from memory")
+        except Exception as e:
+            print(f"[CONTEXT AGENT] Memory load error: {e}")
+        
+        # Generate response using structured parsing
+        result = chain.invoke({"query": query})
+        
+        # Add to memory
+        memory.chat_memory.add_user_message(query)
+        memory.chat_memory.add_ai_message(json.dumps(result))
+        
+        print(f"[CONTEXT AGENT] Structured result: {result}")
         return result
+        
     except Exception as e:
+        print(f"[CONTEXT AGENT] Error: {e}")
+        # Return fallback response
         return {
             "is_clear": False,
-            "is_relevant": False,
+            "is_relevant": True,  # Assume relevance to avoid blocking
             "requires_clarification": True,
-            "clarifying_question": "I apologize, but I encountered an error processing your request. Could you please rephrase your question?",
+            "clarifying_question": "I need more information to help you. Could you please provide more details about your issue?",
             "requires_context": False,
             "additional_context_question": "",
-            "query_summary": "",
-            "response": "I apologize, but I encountered an error processing your request. Could you please rephrase your question?"
+            "query_summary": f"User query needs clarification: {query}"
         }

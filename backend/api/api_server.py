@@ -4,8 +4,10 @@ import os
 from sqlalchemy.orm import Session
 from database import get_db, create_message, get_chat_history
 from models import Base, engine
-from langfuse.callback import CallbackHandler
-from langchain_community.chat_models import ChatOpenAI
+
+# Initialize OpenTelemetry BEFORE importing other modules
+from otel_config import setup_telemetry
+setup_telemetry()
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -36,7 +38,7 @@ from pydantic import BaseModel
 from agents.classifier import classify
 from agents.context_agent import run_context_agent
 from agents.main_agent import handle_message
-from agents.contract_agent import search_contract as check_contract
+from agents.contract_agent import run_contract_agent as check_contract
 
 class TextItem(BaseModel):
     session_id: str
@@ -64,19 +66,23 @@ async def main_agent_ep(item: TextItem, db: Session = Depends(get_db), api_key: 
         {"role": msg.sender, "content": msg.message} for msg in reversed(history)
     ]
 
-    # Get AI response, passing history
-    langfuse_handler = CallbackHandler(
-        public_key="pk-lf-d9a88b84-cdab-44eb-bada-98f2c8567ab7",
-        secret_key="sk-lf-06a5516a-d683-44d4-b2b2-418ad43429f3",
-        host="https://cloud.langfuse.com"
-    )
-    llm = ChatOpenAI(model_name="gpt-4o-mini")
-    response = llm.invoke(item.text, config={"callbacks": [langfuse_handler]})
+    # DEBUG: Print what history we're actually passing
+    print(f"[DEBUG API] Raw history from DB ({len(history)} messages):")
+    for i, msg in enumerate(history):
+        print(f"  {i}: {msg.sender}: {msg.message[:100]}...")
+    
+    print(f"[DEBUG API] Formatted history being passed to main agent ({len(formatted_history)} messages):")
+    for i, msg in enumerate(formatted_history):
+        print(f"  {i}: {msg['role']}: {msg['content'][:100]}...")
+    
+    # Use the actual main agent workflow
+    response = handle_message(db, item.session_id, item.text, formatted_history)
     
     # Store AI response
-    create_message(db, item.session_id, "ai", response.content)
+    chat_output = response.get("chat_output", "")
+    create_message(db, item.session_id, "ai", chat_output)
     
-    return {"chat_output": response.content}
+    return response
 
 @app.post("/contract")
 async def contract_ep(item: TextItem, api_key: str = Depends(verify_api_key)):

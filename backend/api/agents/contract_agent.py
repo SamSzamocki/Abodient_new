@@ -1,11 +1,28 @@
 import os, json
 from pinecone import Pinecone
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain.memory import ConversationBufferWindowMemory
 from langchain.schema import HumanMessage, SystemMessage
-from langchain.memory import ConversationBufferMemory
-from langfuse.callback import CallbackHandler
 
-# --- System prompt ---
+# LLM configuration matching n8n
+llm = ChatOpenAI(model_name="gpt-4o-mini")
+
+# Shared memory storage - matches n8n's shared session key
+session_memories = {}
+
+def get_shared_memory(session_id: str = "187a3d5d3eb44c06b2e3154710ca2ae7") -> ConversationBufferWindowMemory:
+    """
+    Get shared memory - matches n8n's Window Buffer Memory configuration
+    """
+    if session_id not in session_memories:
+        session_memories[session_id] = ConversationBufferWindowMemory(
+            k=5,  # Window size
+            memory_key="chat_history",
+            return_messages=True
+        )
+    return session_memories[session_id]
+
+# EXACT system prompt from n8n contractAgent (2).json
 SYSTEM_PROMPT = """You are an expert in analysing tenancy contracts to help answer user queries. 
 
 Available tool
@@ -22,45 +39,59 @@ Your response to a query must include the full contractual position, clear stati
 
 Your tone must be helpful, clear and friendly"""
 
-# --- Initialise models ---
+# Pinecone configuration matching n8n
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 index = pc.Index("contract-search")
-
 embedder = OpenAIEmbeddings(model="text-embedding-3-small")
-llm = ChatOpenAI(model_name="gpt-4o-mini")
 
-# Add your Langfuse handler (use your latest keys)
-langfuse_handler = CallbackHandler(
-    public_key="pk-lf-d9a88b84-cdab-44eb-bada-98f2c8567ab7",
-    secret_key="sk-lf-06a5516a-d683-44d4-b2b2-418ad43429f3",
-    host="https://cloud.langfuse.com"
-)
-
-session_memories = {}
-
-# --- Main search + LLM interpretation function ---
-def search_contract(query: str) -> str:
+def run_contract_agent(query: str, session_id: str = "187a3d5d3eb44c06b2e3154710ca2ae7") -> str:
     """
-    Given a user query, return a detailed response about what the contract says.
+    Contract agent that matches n8n contractAgent (2).json structure
     """
+    print(f"[CONTRACT AGENT] Processing query: {query}")
+    
+    # Get shared memory
+    memory = get_shared_memory(session_id)
+    
     try:
+        # Vector search - matches n8n's Vector Store Tool configuration
         embedding = embedder.embed_query(query)
         results = index.query(
-            vector=embedding,
-            top_k=10,  # Match n8n's top_k setting
-            include_metadata=True,
-            namespace="contract-1"
+            vector=embedding, 
+            top_k=10,  # Matches n8n topK: 10
+            include_metadata=True, 
+            namespace="contract-1"  # Matches n8n pineconeNamespace
         )
+        
+        # Extract contract snippets
         snippets = "\n".join(match["metadata"]["text"] for match in results["matches"])
-
-        messages = [
-            SystemMessage(content=SYSTEM_PROMPT),
-            HumanMessage(content=f"Search query: {query}\nContract snippets:\n{snippets}")
-        ]
-
-        # Add Langfuse tracing to the LLM call
-        reply = llm.invoke(messages, config={"callbacks": [langfuse_handler]})
-        return reply.content
-
+        print(f"[CONTRACT AGENT] Found {len(results['matches'])} contract matches")
+        
+        # Build messages with memory context
+        messages = [SystemMessage(content=SYSTEM_PROMPT)]
+        
+        # Add conversation history from memory
+        try:
+            memory_vars = memory.load_memory_variables({})
+            if "chat_history" in memory_vars and memory_vars["chat_history"]:
+                messages.extend(memory_vars["chat_history"])
+        except Exception as e:
+            print(f"[CONTRACT AGENT] Memory load error: {e}")
+        
+        # Add current query with contract information
+        query_with_context = f"Query: {query}\ncontractInformation tool results:\n{snippets}"
+        messages.append(HumanMessage(content=query_with_context))
+        
+        # Generate response
+        response = llm.invoke(messages)
+        
+        # Add to memory
+        memory.chat_memory.add_user_message(query)
+        memory.chat_memory.add_ai_message(response.content)
+        
+        print(f"[CONTRACT AGENT] Generated response")
+        return response.content
+        
     except Exception as e:
+        print(f"[CONTRACT AGENT] Error: {str(e)}")
         return "I apologize, but I encountered an error while searching the contract. Please try rephrasing your question."

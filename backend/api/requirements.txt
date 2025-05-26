@@ -15,3 +15,7 @@ aiofiles  # For async file operations
 psycopg2-binary  # PostgreSQL adapter for Python
 sqlalchemy  # SQL toolkit and ORM
 langfuse
+redis
+opentelemetry-sdk
+opentelemetry-exporter-otlp
+openinference-instrumentation-langchain
