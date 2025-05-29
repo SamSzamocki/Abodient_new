@@ -1,0 +1,376 @@
+================================================================================
+CONTRACT AGENT EXECUTION TRACE - COMPLETE WORKFLOW ORCHESTRATION
+================================================================================
+
+EXECUTION METADATA
+------------------
+Workflow ID: rg3M4eJbdkCAZPns
+Workflow Name: Contract_agent
+Status: active=false, isArchived=false
+Agent Type: Tenancy Contract Analysis & Legal Information Retrieval Agent
+Created: 2025-05-18T15:08:21.906Z
+Updated: 2025-05-18T15:08:21.906Z
+
+NODE ARCHITECTURE (17 TOTAL NODES)
+-----------------------------------
+TRIGGER LAYER:
+├─ Execute Workflow Trigger - Position: [0,0]
+│  ├─ Node ID: 41ddb6c1-0cc3-4550-8c8a-81a8f232bad5
+│  ├─ Type: n8n-nodes-base.executeWorkflowTrigger
+│  ├─ Events: workflow_call
+│  └─ Called from Main Agent via ContractAgent tool
+├─ When chat message received (Alternative) - Position: [40,180]
+│  ├─ Node ID: 202ac653-3f04-44cc-a20f-0980e3f92f8e
+│  ├─ Type: @n8n/n8n-nodes-langchain.chatTrigger
+│  ├─ Webhook ID: 86585911-c4a3-4509-8d43-3b59a8886e06
+│  └─ Public: false
+
+INPUT PROCESSING LAYER:
+├─ Edit Fields1 - Position: [220,0]
+│  ├─ Node ID: a5f178f1-4707-48b1-93c8-d12a992a03c5
+│  ├─ Type: n8n-nodes-base.set
+│  ├─ Input Mapping: query → contract_query, chatInput → chat_query
+│  └─ Purpose: Standardize input format for AI Agent
+
+AI PROCESSING LAYER:
+├─ AI Agent - Position: [620,20]
+│  ├─ Node ID: d23179fe-fddf-4d58-8bd0-5dcc6712cd42
+│  ├─ Type: @n8n/n8n-nodes-langchain.agent
+│  ├─ Agent Type: toolsAgent
+│  ├─ Input: {{ $json.contract_query }}{{ $json.chat_query }}
+│  ├─ Connected to: Vector Store Tool + Window Buffer Memory + OpenAI Chat Model2
+│  └─ Purpose: Analyze tenancy contracts and extract relevant legal information
+
+SUPPORTING INFRASTRUCTURE:
+├─ Window Buffer Memory - Position: [660,240]
+│  ├─ Node ID: a94cb865-a5ba-46d8-9a74-61fe37f282d9
+│  ├─ Session ID Type: customKey (automatic from previous node)
+│  ├─ Context Window Length: 5 conversation turns
+│  └─ Integration: ai_memory connection to AI Agent
+├─ OpenAI Chat Model2 - Position: [500,240]
+│  ├─ Node ID: c1d652ac-d64f-42af-a981-3e7deba705b6
+│  ├─ Model: gpt-4o-mini
+│  ├─ Credentials: OpenAi account (ce4Dko4ewvOjQLgW)
+│  └─ Integration: ai_languageModel connection to AI Agent
+
+VECTOR SEARCH INFRASTRUCTURE:
+├─ Vector Store Tool - Position: [820,280]
+│  ├─ Node ID: 89f1b347-0aa9-4fff-b361-857bff94dc41
+│  ├─ Type: @n8n/n8n-nodes-langchain.toolVectorStore
+│  ├─ Tool Name: "contractInformation"
+│  ├─ Description: "Returns relevant contractual information related to the query"
+│  ├─ Top K: 10 (retrieves top 10 relevant contract sections)
+│  └─ Integration: ai_tool connection to AI Agent
+├─ Pinecone Vector Store2 - Position: [780,440]
+│  ├─ Node ID: ebcd0004-1c22-4b3a-a99f-5330df8d9cee
+│  ├─ Mode: retrieve
+│  ├─ Index: contract-search
+│  ├─ Namespace: contract-1
+│  ├─ Credentials: PineconeApi account (smzRdo3KiNPafnXx)
+│  └─ Integration: ai_vectorStore connection to Vector Store Tool
+├─ Embeddings OpenAI2 - Position: [860,600]
+│  ├─ Node ID: 1b4a2e7f-8f8d-4f72-adc7-fc0010e40433
+│  ├─ Model: text-embedding-3-small
+│  ├─ Credentials: OpenAi account (ce4Dko4ewvOjQLgW)
+│  └─ Integration: ai_embedding connection to Pinecone Vector Store2
+├─ OpenAI Chat Model - Position: [1080,400]
+│  ├─ Node ID: 0893efe9-1fa1-4df0-9161-37914c9ccdbb
+│  ├─ Model: gpt-4o (higher capability for legal analysis)
+│  ├─ Response Format: text
+│  ├─ Credentials: OpenAi account (ce4Dko4ewvOjQLgW)
+│  └─ Integration: ai_languageModel connection to Vector Store Tool
+
+DOCUMENT INGESTION PIPELINE (SETUP/CONFIGURATION LAYER):
+├─ When clicking 'Test workflow' - Position: [-1180,40]
+│  ├─ Node ID: 6a55eae7-437f-46f3-85bd-773126c32c0a
+│  ├─ Type: n8n-nodes-base.manualTrigger
+│  └─ Purpose: Manual testing of document ingestion
+├─ Edit Fields - Position: [-980,40]
+│  ├─ Node ID: 9e49a629-dace-4f9c-b0e3-c9970e615449
+│  ├─ Type: n8n-nodes-base.set
+│  ├─ file_url: https://drive.google.com/file/d/1eU4Cw89XRe9vsz_S8EzsUZcquBV_QEOc/view?usp=drive_link
+│  └─ Purpose: Set tenancy contract document URL
+├─ Google Drive - Position: [-720,40]
+│  ├─ Node ID: 5cca0956-afd9-4488-bfc9-8d64270af70f
+│  ├─ Type: n8n-nodes-base.googleDrive
+│  ├─ Operation: download file
+│  ├─ Authentication: oAuth2
+│  └─ Purpose: Download tenancy contract from Google Drive
+├─ Pinecone Vector Store1 (Insert) - Position: [-500,40]
+│  ├─ Node ID: 3b032515-3537-4a71-8a53-f6b85f6e8d1d
+│  ├─ Mode: insert (for document ingestion)
+│  ├─ Index: contract-search
+│  ├─ Namespace: contract-1
+│  └─ Purpose: Store contract document chunks as vectors
+├─ Default Data Loader - Position: [-320,300]
+│  ├─ Node ID: d6168283-edb9-4c68-b30e-d5833662f6ab
+│  ├─ Data Type: binary
+│  ├─ Binary Mode: allInputData
+│  ├─ Loader: auto
+│  └─ Purpose: Process contract document for chunking
+├─ Recursive Character Text Splitter - Position: [-340,440]
+│  ├─ Node ID: 18ee4e51-9aab-4958-95ac-e6534502e2df
+│  ├─ Chunk Size: 1000 characters
+│  ├─ Chunk Overlap: 100 characters
+│  └─ Purpose: Split contract into searchable chunks
+├─ Embeddings OpenAI1 (Insert) - Position: [-460,260]
+│  ├─ Node ID: 27ef1a68-1904-4ec1-98c7-57d648cdb95b
+│  ├─ Model: text-embedding-3-small
+│  ├─ Credentials: OpenAi account (ce4Dko4ewvOjQLgW)
+│  └─ Purpose: Generate embeddings for contract document chunks
+
+================================================================================
+SYSTEM PROMPT ARCHITECTURE
+================================================================================
+
+ROLE DEFINITION:
+"Expert in analysing tenancy contracts to help answer user queries"
+
+TOOL ORCHESTRATION:
+Available Tool: contractInformation
+├─ Purpose: Find relevant contractual information for tenant queries
+├─ Method: Vector search through indexed tenancy contract
+└─ Returns: Top 10 most relevant contract sections and clauses
+
+PROCESSING WORKFLOW:
+1. **Intent Understanding**: Analyze query to identify contractual elements needed
+2. **Vector Query Creation**: Convert to efficient contract search terms
+3. **Contract Search**: Pass vector query to contractInformation tool
+4. **Legal Analysis**: Extract and interpret relevant contract provisions
+
+OUTPUT REQUIREMENTS:
+├─ Content: Full contractual position with specific contract sections
+├─ Detail: Maximum relevant information to comprehensively answer query
+├─ Citations: Clear reference to relevant contract sections
+├─ Tone: Helpful, clear, and friendly
+└─ Accuracy: Precise interpretation of contractual obligations and rights
+
+VECTOR SEARCH CONFIGURATION:
+├─ Index: contract-search (Pinecone)
+├─ Namespace: contract-1
+├─ Retrieval: Top K=10 relevant contract sections
+├─ Embedding Model: text-embedding-3-small
+└─ Analysis Model: gpt-4o (high capability for legal reasoning)
+
+================================================================================
+EXECUTION FLOW SEQUENCE
+================================================================================
+
+1. WORKFLOW TRIGGER ACTIVATION
+------------------------------
+Trigger Source: Main Agent ContractAgent tool call
+Input Parameters:
+├─ query: Vector search query (from Main Agent Step 2)
+├─ chatInput: null (typically)
+└─ Execution Context: Step 3 of Main Agent workflow
+
+2. INPUT FIELD TRANSFORMATION
+-----------------------------
+Edit Fields1 Node Processing:
+├─ contract_query ← query (vector search terms)
+├─ chat_query ← chatInput (null in this case)
+└─ Combined Input: {{ $json.contract_query }}{{ $json.chat_query }}
+
+3. MEMORY SYSTEM ACTIVATION
+---------------------------
+Window Buffer Memory Operations:
+├─ Session ID: Automatic from previous node (Main Agent session)
+├─ Context Window: 5 conversation turns
+├─ Memory Retrieval: Previous contract queries in session
+└─ Purpose: Maintain consistency across contract analysis calls
+
+4. AI AGENT ORCHESTRATION
+-------------------------
+Model Configuration:
+├─ Primary Model: gpt-4o-mini (for agent reasoning)
+├─ Vector Model: gpt-4o (for legal contract analysis)
+├─ Input: Vector search query + conversation context
+└─ Available Tool: contractInformation
+
+PROCESSING LOGIC:
+Step 1: Analyze input query to identify contractual issues
+Step 2: Convert query to effective contract search terms
+Step 3: Call contractInformation tool with search terms
+Step 4: Receive top 10 relevant contract sections
+Step 5: Interpret and analyze retrieved contract provisions
+Step 6: Generate comprehensive response with full contractual position
+
+5. VECTOR SEARCH EXECUTION
+--------------------------
+ContractInformation Tool Activation:
+├─ Input: Optimized contract search query
+├─ Vector Store: Pinecone (contract-search/contract-1)
+├─ Embedding Generation: text-embedding-3-small
+├─ Similarity Search: Retrieve top 10 contract matches
+├─ LLM Analysis: gpt-4o processes retrieved contract sections
+└─ Output: Relevant contractual information and legal position
+
+PINECONE SEARCH PROCESS:
+1. Query → Embeddings OpenAI2 → Vector embedding
+2. Vector embedding → Pinecone Vector Store2 → Similarity search
+3. Top 10 contract sections → OpenAI Chat Model (gpt-4o) → Legal analysis
+4. Analysis results → Vector Store Tool → Structured response
+5. Structured response → AI Agent → Comprehensive contract interpretation
+
+6. CONTRACT ANALYSIS GENERATION
+-------------------------------
+AI Agent Synthesis:
+├─ Input: Contract search results + conversation context
+├─ Processing: Legal interpretation + contractual position analysis
+├─ Output Format: Comprehensive contractual response
+├─ Content Elements:
+│  ├─ Full contractual position
+│  ├─ Specific contract section references
+│  ├─ Rights and obligations interpretation
+│  ├─ Relevant clauses and provisions
+│  └─ Comprehensive information to answer query
+└─ Return: Contract analysis back to Main Agent
+
+================================================================================
+CONTRACT DOCUMENT ARCHITECTURE
+================================================================================
+
+DATA SOURCE:
+├─ Google Drive: Tenancy contract document
+├─ Document ID: 1eU4Cw89XRe9vsz_S8EzsUZcquBV_QEOc
+├─ URL: https://drive.google.com/file/d/1eU4Cw89XRe9vsz_S8EzsUZcquBV_QEOc/view?usp=drive_link
+├─ Content: Complete tenancy agreement with all terms and conditions
+└─ Format: PDF/document format with legal clauses and provisions
+
+INGESTION PIPELINE:
+1. Google Drive → Document download
+2. Default Data Loader → Document processing
+3. Recursive Character Text Splitter → 1000-char chunks (100 overlap)
+4. Embeddings OpenAI1 → text-embedding-3-small vectors
+5. Pinecone Vector Store1 → Insert into contract-search/contract-1
+
+RETRIEVAL CONFIGURATION:
+├─ Index: contract-search
+├─ Namespace: contract-1
+├─ Embedding Model: text-embedding-3-small (consistency with ingestion)
+├─ Retrieval Count: Top K=10
+├─ Analysis Model: gpt-4o (high capability for legal reasoning)
+└─ Tool Integration: contractInformation exposed to AI Agent
+
+CONTRACT CONTENT STRUCTURE:
+├─ Legal Clauses: Detailed provisions and conditions
+├─ Rights & Obligations: Tenant and landlord responsibilities
+├─ Terms & Conditions: Specific agreement parameters
+├─ Policies & Procedures: Property management guidelines
+└─ Legal References: Statutory and regulatory compliance
+
+================================================================================
+INPUT/OUTPUT DATA FLOW
+================================================================================
+
+INPUT RECEIVED FROM MAIN AGENT:
+Vector Query: Optimized search terms (e.g., "fridge appliance repair maintenance")
+├─ Source: Main Agent Step 2 (query vectorization)
+├─ Context: Tenant issue requiring contractual clarification
+└─ Session: Maintained from Context Agent execution
+
+VECTOR SEARCH PERFORMED:
+1. Query embedding generation
+2. Similarity search in contract document chunks
+3. Retrieval of top 10 relevant contract sections
+4. LLM analysis of retrieved contract provisions
+5. Legal interpretation based on contract terms
+
+CONTRACT ANALYSIS OUTPUT GENERATED:
+Format: Comprehensive contractual response
+Example Elements:
+├─ Contractual Position: Clear statement of rights/obligations
+├─ Section References: Specific contract clause citations
+├─ Legal Interpretation: Detailed analysis of relevant provisions
+├─ Comprehensive Information: All relevant details to answer query
+└─ Clear Guidance: Practical implications of contractual terms
+
+OUTPUT RETURNED TO MAIN AGENT:
+Structured contract analysis ready for integration with urgency classification and final response generation.
+
+================================================================================
+MEMORY CONTINUITY SYSTEM
+================================================================================
+
+SESSION MANAGEMENT:
+├─ Linked Session: Uses same session ID as Main Agent
+├─ Context Preservation: Maintains conversation thread across tool calls
+├─ Memory Window: 5 conversation turns
+└─ Consistency: Contract analysis informed by conversation history
+
+CONTRACT ANALYSIS CONTEXT:
+├─ Previous Queries: Pattern recognition across multiple contract searches
+├─ Legal Consistency: Coherent interpretation across related contract issues
+├─ Citation Tracking: Reference to previously discussed contract sections
+└─ Response Style: Maintains helpful, clear, friendly tone with legal accuracy
+
+================================================================================
+TOOL INTEGRATION ORCHESTRATION
+================================================================================
+
+MAIN AGENT TOOL INTEGRATION:
+├─ Tool Name: "ContractAgent"
+├─ Description: "Call this agent to search contract information"
+├─ Workflow ID: rg3M4eJbdkCAZPns
+├─ Execution Method: Execute Workflow Trigger
+├─ Input: Vector search query from Main Agent Step 2
+└─ Return Path: Contract analysis back to Main Agent
+
+MAIN AGENT WORKFLOW STEP:
+This Contract Agent execution represents Step 3 of the Main Agent's 5-step process:
+Step 1: ✓ ContextAgent analysis (COMPLETE)
+Step 2: ✓ Query vectorization (COMPLETE)
+Step 3: ✓ ContractAgent call (THIS EXECUTION)
+Step 4: → ClassifierAgent call (NEXT)
+Step 5: → Final response generation (PENDING)
+
+VECTOR SEARCH INTEGRATION:
+├─ Database: Complete tenancy contract indexed and chunked
+├─ Search Method: Semantic similarity via embeddings
+├─ Analysis: GPT-4o for sophisticated legal interpretation
+├─ Output: Comprehensive contractual position for Main Agent synthesis
+└─ Accuracy: Precise citation of relevant contract sections
+
+================================================================================
+CRITICAL EXECUTION DEPENDENCIES
+================================================================================
+
+REQUIRED FOR SUCCESSFUL EXECUTION:
+✓ OpenAI API access for both gpt-4o-mini and gpt-4o models
+✓ Pinecone vector database with contract-search index
+✓ Complete tenancy contract data in contract-1 namespace
+✓ Google Drive API access for contract document retrieval
+✓ Main Agent tool call with valid vector query
+✓ Session memory consistency across tool calls
+✓ text-embedding-3-small embedding model availability
+
+FAILURE POINTS:
+✗ Pinecone service interruption or API limits
+✗ OpenAI model availability or quota exhaustion
+✗ Vector database corruption or missing contract data
+✗ Google Drive access issues or document unavailability
+✗ Memory session conflicts between Main Agent and Contract Agent
+✗ Invalid or empty vector query from Main Agent
+✗ Tool integration communication failures
+
+SUCCESS INDICATORS:
+✓ Vector search returns relevant contract sections
+✓ Contract analysis generated within expected timeframe
+✓ Accurate citation of specific contract clauses
+✓ Comprehensive contractual position provided
+✓ Legal interpretation maintains accuracy and clarity
+✓ Structured response ready for Main Agent integration
+✓ Memory session maintained for future contract queries
+
+================================================================================
+ORCHESTRATION INSIGHTS
+================================================================================
+
+1. WORKFLOW INTEGRATION: Seamless execution as Main Agent tool call within Step 3
+2. VECTOR SEARCH: Sophisticated semantic search through complete tenancy contract
+3. DUAL MODEL ARCHITECTURE: gpt-4o-mini for agent reasoning, gpt-4o for legal analysis
+4. MEMORY CONTINUITY: Perfect session alignment with Main Agent conversation thread
+5. LEGAL ACCURACY: Precise interpretation and citation of contractual provisions
+6. COMPREHENSIVE ANALYSIS: Maximum relevant information extraction from contract
+7. KNOWLEDGE BASE: Complete tenancy agreement indexed for accurate legal guidance
+8. RESPONSE INTEGRATION: Output structured for seamless Main Agent synthesis

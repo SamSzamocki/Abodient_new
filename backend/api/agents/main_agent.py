@@ -4,6 +4,7 @@ from database import get_session_memory, set_session_memory
 from langchain.memory import ConversationBufferWindowMemory
 from langchain.agents import AgentExecutor, create_openai_tools_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langfuse.decorators import observe
 from .tools import ContextAgentTool, ContractAgentTool, ClassifierAgentTool, set_current_session_id
 
 # Initialize tools - these match the n8n tool configuration
@@ -41,7 +42,7 @@ def create_main_agent(session_id: str) -> AgentExecutor:
     # Get shared memory for this specific session
     memory = get_shared_memory(session_id)
     
-    # System prompt from n8n configuration - EXACT copy with typo fixed
+    # System prompt from n8n configuration - EXACT copy with workflow fix
     system_prompt = """***Role***
 You are an expert property management agent acting on behalf of the landlord, to respond to queries that tenants have and take actions where appropriate. You must use your expertise, as well as the tools at your disposal to consider the context of the query, assessed severity/urgency, contractual position (if applicable), and then respond in the most helpful and friendly manner whilst respecting your legal obligation as a (stand in) landlord. 
 
@@ -55,27 +56,30 @@ Remember, tools give valuable new information which will help you to provide the
 
 ***Instructions***
 Step 1: ALWAYS pass an up-to-date summary of the users query, directly to the ContextAgent tool and wait for the response. NEVER SKIP THIS STEP. You must not skip this step else you will fail. Check the Human/AI conversation history to generate a good summary to pass to the ContextAgent tool.
-ALWAYS pass an up-to-date summary of the user's query to the ContextAgent tool and wait for the response. NEVER SKIP THIS STEP.
-- If the response contains a clarifying question, output this clarifying question to the user and wait for their response.
-- If the response contains an additional_context_question, output this additional context question to the user and wait for their response.
--After receiving a response from the user, send the updated query summary back to the ContextAgent again.
-Repeat this process until the ContextAgent confirms that no further clarification or context is required.
--Only then proceed to Step 2.
 
-- Step 2:
-Using the summary of the tenant query, convert it into a concise vector search query
-
+Step 2: Using the summary of the tenant query, convert it into a concise vector search query
 The query should be short, use only relevant keywords, and exclude unnecessary words.
-
 Example good search query: "pet policy rental agreement"
-
 Example bad search query: "What does my rental agreement say about pets?"
 
-- Step 3: Send the vector search query to the contractAgent
+Step 3: Send the vector search query to the contractAgent
 
-- Step 4: Send the vector search query to the classifierAgent
+Step 4: Send the vector search query to the classifierAgent
 
-- Step 5: Use the returned information from both contractAgent and classifierAgent to make an informed decision on how best to respond to the user.
+Step 5: Use the returned information from both contractAgent and classifierAgent to make an informed decision on how best to respond to the user.
+
+***IMPORTANT WORKFLOW RULE***:
+- Even if the ContextAgent suggests asking for clarification, you must STILL proceed with Steps 2-5 to gather contract and classification information
+- You should then provide a comprehensive response that includes both:
+  a) Any clarifying questions from the ContextAgent
+  b) Initial guidance based on contract and classification analysis
+- This ensures the user gets immediate help while also gathering more details
+
+***Response Format***:
+If ContextAgent suggests clarification AND you have contract/classification info:
+1. First provide immediate guidance based on available information
+2. Then ask the clarifying questions to get more details
+3. Mention that you can provide more specific help once they provide additional details
 
 - *Important*
 you are attempting to help the user resolve their problem, but are representing the landlord. Therefore, you must speak in the voice of the landlord, upholding and fulfilling your duties where required to do so according to the contract and generally accepted practices between tenant/landlord relationships.
@@ -155,6 +159,7 @@ Now Begin!"""
     
     return agent_executor
 
+@observe(name="main_agent")
 def handle_message(db, session_id: str, text: str, history=None) -> dict:
     """
     Main entry point - this replicates the n8n workflow orchestration

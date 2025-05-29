@@ -3,9 +3,11 @@ from pinecone import Pinecone
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain.memory import ConversationBufferWindowMemory
 from langchain.schema import HumanMessage, SystemMessage
+from langchain_pinecone import PineconeVectorStore
+from langfuse.decorators import observe
 
 # LLM configuration matching n8n
-llm = ChatOpenAI(model_name="gpt-4o-mini")
+llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0)
 
 # Shared memory storage - matches n8n's shared session key
 session_memories = {}
@@ -44,6 +46,10 @@ pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 index = pc.Index("contract-search")
 embedder = OpenAIEmbeddings(model="text-embedding-3-small")
 
+# Initialize embeddings and vector store
+vectorstore = PineconeVectorStore(index=index, embedding=embedder)
+
+@observe(name="contract_agent")
 def run_contract_agent(query: str, session_id: str = "187a3d5d3eb44c06b2e3154710ca2ae7") -> str:
     """
     Contract agent that matches n8n contractAgent (2).json structure

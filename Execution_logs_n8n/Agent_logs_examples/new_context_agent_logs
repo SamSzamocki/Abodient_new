@@ -1,0 +1,285 @@
+================================================================================
+CONTEXT AGENT EXECUTION TRACE - COMPLETE WORKFLOW ORCHESTRATION
+================================================================================
+
+EXECUTION METADATA
+------------------
+Execution ID: 71
+Workflow ID: QLo26z2Skc7ze3ga (Called from Main Agent)
+Status: success
+Agent Type: Standalone Context Analysis Agent
+Trigger Method: Execute Workflow Trigger (from Main Agent tool call)
+
+NODE ARCHITECTURE (5 TOTAL NODES)
+-----------------------------------
+TRIGGER LAYER:
+├─ Execute Workflow Trigger - Index: 0 | Duration: 0ms
+│  └─ Called from Main Agent via ContextAgent tool
+
+INPUT PROCESSING LAYER:
+├─ Edit Fields1 - Index: 1 | Duration: 90ms  
+│  ├─ Purpose: Transform input parameters
+│  ├─ Maps: query → contract_query, chatInput → chat_query
+│  └─ Output: Structured input for AI Agent
+
+AI PROCESSING LAYER:
+├─ AI Agent - Index: 2 | Duration: 2526ms
+│  ├─ Agent Type: Context analysis specialist
+│  ├─ Connected to: Window Buffer Memory + OpenAI Chat Model5
+│  └─ Purpose: Analyze query completeness and gather context
+
+SUPPORTING INFRASTRUCTURE:
+├─ Window Buffer Memory - Index: 3 | Duration: 0ms
+│  ├─ Session Management: Persistent across calls
+│  ├─ Context Window: Maintains conversation history
+│  └─ Integration: ai_memory connection to AI Agent
+├─ OpenAI Chat Model5 - Index: 4 | Duration: 2303ms
+│  ├─ Model: gpt-4o-mini
+│  ├─ Integration: ai_languageModel connection to AI Agent
+│  └─ Configuration: 60s timeout, 2 max retries
+
+================================================================================
+SYSTEM PROMPT ARCHITECTURE
+================================================================================
+
+ROLE DEFINITION:
+"Expert at ensuring tenant queries contain all the necessary context to facilitate a resolution"
+
+CORE RESPONSIBILITIES:
+1. **Clarity Assessment**: Determine if question is clear and relevant to tenancy
+2. **Context Gathering**: Collect all necessary contextual information
+   - WHAT: Exact problem description
+   - WHERE: Location/room/property area
+   - WHEN: Timeline and progression
+   - HOW: Impact on tenant
+   - ATTEMPTS: Previous resolution efforts
+
+RESPONSE VALIDATION CRITERIA:
+├─ Question Clarity: Is intent clear?
+├─ Relevance Check: Tenancy-related issue?
+├─ Context Completeness: All 5 W's answered?
+└─ Next Steps: Clarification needed or ready to proceed?
+
+OUTPUT SCHEMA (STRICT JSON):
+{
+  "is_clear": boolean,
+  "is_relevant": boolean, 
+  "requires_clarification": boolean,
+  "clarifying_question": string,
+  "requires_context": boolean,
+  "additional_context_question": string,
+  "query_summary": string
+}
+
+EXAMPLES PROVIDED:
+1. Broken Lock → Missing context (which lock, accessibility, timeline)
+2. Kitchen Sink Leak → Complete context (location, timeline, attempts, impact)
+
+================================================================================
+EXECUTION FLOW SEQUENCE
+================================================================================
+
+1. WORKFLOW TRIGGER ACTIVATION
+------------------------------
+Trigger Source: Main Agent ContextAgent tool call
+Input Parameters:
+├─ query: "User has a non-functioning fridge that stopped working yesterday..."
+├─ chatInput: null
+└─ Execution Context: Step 1 of Main Agent workflow
+
+2. INPUT FIELD TRANSFORMATION
+-----------------------------
+Edit Fields1 Node Processing:
+├─ contract_query ← query (original input)
+├─ chat_query ← chatInput (null in this case)
+└─ Purpose: Standardize input format for AI Agent
+
+3. MEMORY SYSTEM ACTIVATION
+---------------------------
+Window Buffer Memory Operations:
+
+LOAD MEMORY VARIABLES:
+Action: loadMemoryVariables
+Context Retrieved: 3 previous conversation turns
+Memory Structure:
+├─ input: Current query text
+├─ system_message: Full Context Agent system prompt
+├─ formatting_instructions: JSON schema requirements
+└─ chat_history: Previous conversation context
+
+CONVERSATION HISTORY LOADED:
+TURN 1: Bathroom door smashed → Context gathering required
+├─ Human: "User has an issue with the bathroom door being smashed."
+└─ AI: Requested damage details, functionality, timeline
+
+TURN 2: Door damage details provided → Context complete
+├─ Human: "Tenant smashed bathroom door with hammer, off hinges yesterday"
+└─ AI: Context complete, ready for next workflow step
+
+TURN 3: Fridge not working → Context gathering required  
+├─ Human: "User has an issue with their fridge, stating that it is not working."
+└─ AI: Requested specific malfunction, timeline, troubleshooting attempts
+
+4. AI PROCESSING ORCHESTRATION
+------------------------------
+Model Configuration:
+├─ Model: gpt-4o-mini (OpenAI)
+├─ Timeout: 60000ms
+├─ Max Retries: 2
+├─ Estimated Input Tokens: 1265
+└─ Context: Current query + conversation history + system prompt
+
+PROCESSING LOGIC:
+Step 1: Load full system prompt with examples
+Step 2: Append conversation history for context
+Step 3: Analyze current query against 5 W's framework
+Step 4: Determine if additional context needed
+Step 5: Generate structured JSON response
+
+CONTEXT EVALUATION MATRIX:
+├─ WHAT: ✓ "Non-functioning fridge"
+├─ WHERE: ? (Assumed kitchen/property)
+├─ WHEN: ✓ "Stopped working yesterday"
+├─ HOW: ✓ "Power is on, no unusual sounds/temperatures"
+├─ ATTEMPTS: ✓ "Haven't tried to fix it"
+└─ DECISION: Context sufficient → No further questions needed
+
+5. RESPONSE GENERATION
+----------------------
+AI Output Generated:
+{
+  "is_clear": true,
+  "is_relevant": true,
+  "requires_clarification": false,
+  "clarifying_question": "",
+  "requires_context": false,
+  "additional_context_question": "",
+  "query_summary": "User's fridge stopped working yesterday, the power is on, and they haven't noticed any unusual sounds or temperatures. They haven't attempted any fixes yet."
+}
+
+TOKEN USAGE METRICS:
+├─ Prompt Tokens: 1280 (system + history + current query)
+├─ Completion Tokens: 86
+├─ Total Tokens: 1366
+├─ Model: gpt-4o-mini-2024-07-18
+└─ Finish Reason: stop
+
+6. MEMORY UPDATE OPERATION
+--------------------------
+SAVE CONTEXT:
+Action: saveContext
+New Context Added:
+├─ input: Current query
+├─ system_message: Full prompt
+├─ formatting_instructions: JSON schema
+├─ chat_history: Updated with new turn
+└─ output: Generated JSON response
+
+Memory Persistence: Context saved for future Main Agent calls
+
+================================================================================
+INPUT/OUTPUT DATA FLOW
+================================================================================
+
+INPUT RECEIVED FROM MAIN AGENT:
+Raw Query: "User has a non-functioning fridge that stopped working yesterday, hasn't noticed any unusual sounds or temperatures, hasn't tried to fix it, but the power is on."
+
+CONTEXT ANALYSIS PERFORMED:
+✓ Clarity: Query is clear and specific
+✓ Relevance: Appliance malfunction is tenancy-related
+✓ Context Completeness:
+  - Problem: Non-functioning fridge (WHAT)
+  - Timeline: Started yesterday (WHEN)  
+  - Status: Power on, no sounds/temps (HOW)
+  - Attempts: None tried yet (ATTEMPTS)
+  - Location: Implied residential property (WHERE)
+
+DECISION LOGIC:
+Since all critical context elements are present, no additional questions needed.
+Query is ready for next workflow step (contract/classifier analysis).
+
+OUTPUT RETURNED TO MAIN AGENT:
+Structured JSON confirming query completeness and providing summary.
+
+================================================================================
+MEMORY CONTINUITY SYSTEM
+================================================================================
+
+SESSION MANAGEMENT:
+├─ Persistent Memory: Maintains context across tool calls
+├─ Conversation Tracking: 3 previous turns loaded
+├─ Context Window: Efficiently manages token usage
+└─ State Preservation: Query history influences current analysis
+
+MEMORY INTEGRATION POINTS:
+1. LOAD: Previous conversations inform current context evaluation
+2. PROCESS: Historical patterns help determine completeness
+3. SAVE: New interaction added to conversation history
+4. PERSIST: Memory available for subsequent Main Agent calls
+
+CONVERSATION PROGRESSION INSIGHT:
+Turn 1-2: Bathroom door issue → Context gathering → Resolution
+Turn 3-4: Fridge issue (previous) → Context gathering → In progress  
+Turn 5: Fridge issue (current) → Context complete → Ready for next step
+
+================================================================================
+TOOL INTEGRATION ORCHESTRATION
+================================================================================
+
+MAIN AGENT TOOL INTEGRATION:
+├─ Tool Name: "ContextAgent"
+├─ Description: "Call this agent to get more context on the question"
+├─ Workflow ID: BAa1dwbqTsN59O4s
+├─ Execution Method: Execute Workflow Trigger
+└─ Return Path: JSON response back to Main Agent
+
+INPUT SCHEMA FLEXIBILITY:
+├─ Primary: query parameter (main input)
+├─ Secondary: chatInput parameter (optional)
+├─ Processing: Edit Fields1 standardizes both inputs
+└─ Output: Consistent JSON structure regardless of input method
+
+MAIN AGENT WORKFLOW STEP:
+This Context Agent execution represents Step 1 of the Main Agent's 5-step process:
+Step 1: ✓ ContextAgent analysis (THIS EXECUTION)
+Step 2: → Query vectorization (NEXT)
+Step 3: → ContractAgent call (PENDING)
+Step 4: → ClassifierAgent call (PENDING)
+Step 5: → Final response generation (PENDING)
+
+================================================================================
+CRITICAL EXECUTION DEPENDENCIES
+================================================================================
+
+REQUIRED FOR SUCCESSFUL EXECUTION:
+✓ OpenAI API access and quota availability
+✓ Window Buffer Memory session management
+✓ Main Agent tool call with valid query parameter
+✓ JSON schema validation and formatting
+✓ Memory persistence across workflow executions
+
+FAILURE POINTS:
+✗ OpenAI API rate limits or service interruption
+✗ Memory session corruption or conflicts
+✗ Invalid input parameters from Main Agent
+✗ JSON parsing/validation failures
+✗ Timeout on LLM response generation
+
+SUCCESS INDICATORS:
+✓ Context analysis completed within 2.5 seconds
+✓ Valid JSON structure returned
+✓ Memory successfully updated with new conversation turn
+✓ Clear decision made on context completeness
+✓ Ready signal sent back to Main Agent for next workflow step
+
+================================================================================
+ORCHESTRATION INSIGHTS
+================================================================================
+
+1. WORKFLOW INTEGRATION: Seamless execution as Main Agent tool call
+2. MEMORY CONTINUITY: Perfect session management across multiple calls
+3. CONTEXT EVALUATION: Systematic analysis using 5 W's framework  
+4. DECISION MAKING: Clear binary output (more context needed or ready to proceed)
+5. PERFORMANCE: Efficient processing within acceptable time bounds
+6. RELIABILITY: Consistent JSON structure enables reliable Main Agent parsing
+7. SCALABILITY: Memory system handles conversation history without degradation

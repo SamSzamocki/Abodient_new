@@ -6,37 +6,38 @@ from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import PromptTemplate
 from pydantic import BaseModel, Field
 from typing import Optional
+from langfuse.decorators import observe
 
 # Define the expected response structure
 class ContextResponse(BaseModel):
     is_clear: bool = Field(description="Whether the question is clear")
     is_relevant: bool = Field(description="Whether the question is relevant to tenancy")
     requires_clarification: bool = Field(description="Whether clarification is needed")
-    clarifying_question: str = Field(description="The clarifying question to ask", default="")
+    clarifying_question: str = Field(description="The clarifying question to ask")
     requires_context: bool = Field(description="Whether additional context is needed")
-    additional_context_question: str = Field(description="The context question to ask", default="")
-    query_summary: str = Field(description="Summary of the user's issue")
+    additional_context_question: str = Field(description="The context question to ask")
+    query_summary: str = Field(description="Summary of the query")
 
-# Create output parser
+# Initialize the JSON output parser with the Pydantic model
 parser = JsonOutputParser(pydantic_object=ContextResponse)
 
-# LLM configuration matching n8n
-llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0)
+# LLM configuration
+llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.3)
 
-# Shared memory storage - matches n8n's shared session key
-session_memories = {}
+# Memory storage - shared across calls
+memory_storage = {}
 
 def get_shared_memory(session_id: str = "187a3d5d3eb44c06b2e3154710ca2ae7") -> ConversationBufferWindowMemory:
     """
     Get shared memory - matches n8n's Window Buffer Memory configuration
     """
-    if session_id not in session_memories:
-        session_memories[session_id] = ConversationBufferWindowMemory(
+    if session_id not in memory_storage:
+        memory_storage[session_id] = ConversationBufferWindowMemory(
             k=5,  # Window size
             memory_key="chat_history",
             return_messages=True
         )
-    return session_memories[session_id]
+    return memory_storage[session_id]
 
 # EXACT system prompt from n8n ContextAgent.json with structured output instructions
 SYSTEM_PROMPT = """### **Role**
@@ -146,6 +147,7 @@ Your response must strictly follow this JSON structure:
 {format_instructions}
 """
 
+@observe(name="context_agent")
 def run_context_agent(query: str, session_id: str = "187a3d5d3eb44c06b2e3154710ca2ae7") -> dict:
     """
     Context agent that matches n8n ContextAgent.json structure exactly

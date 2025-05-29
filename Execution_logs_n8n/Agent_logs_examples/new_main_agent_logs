@@ -1,0 +1,242 @@
+================================================================================
+MAIN AGENT EXECUTION TRACE - COMPLETE WORKFLOW ORCHESTRATION
+================================================================================
+
+EXECUTION METADATA
+------------------
+Workflow ID: QLo26z2Skc7ze3ga
+Workflow Name: Main_agent  
+Status: Active Workflow
+Webhook ID: c79e88b8-63f7-4721-b655-8aafd4eb221d
+
+NODE ARCHITECTURE (21 TOTAL NODES)
+-----------------------------------
+TRIGGER LAYER:
+├─ When chat message received (Chat Trigger) - Position: [-440,400]
+├─ When clicking "Execute Workflow" (Manual Trigger) - Position: [0,0]
+
+AI AGENT LAYER:
+├─ AI Agent (toolsAgent) - Position: [-40,500]
+├─ OpenAI Chat Model5 (gpt-4o-mini) - Position: [-160,740]
+├─ Window Buffer Memory (5 conversation turns) - Position: [-160,1000]
+│  └─ Session Key: 187a3d5d3eb44c06b2e3154710ca2ae7
+
+TOOL LAYER (Connected as ai_tool to AI Agent):
+├─ Context_agent (Workflow Tool) - Position: [-20,880]
+│  └─ Workflow ID: BAa1dwbqTsN59O4s
+├─ Contract_agent (Workflow Tool) - Position: [120,880]  
+│  └─ Workflow ID: rg3M4eJbdkCAZPns
+├─ Classifier_agent (Workflow Tool) - Position: [280,880]
+│  └─ Workflow ID: iXHMrTw7UTJxLFdn
+
+OUTPUT PROCESSING LAYER:
+├─ Basic LLM Chain (Structured Parser) - Position: [360,500]
+│  ├─ OpenAI Chat Model2 (gpt-4o-mini) - Position: [400,700]
+│  └─ Structured Output Parser1 - Position: [620,760]
+│      └─ Schema: {chat_output, query_summary, actions}
+
+CONDITIONAL PROCESSING:
+├─ If (Actions Not Empty Check) - Position: [720,420]
+│  ├─ TRUE Path: Actions → HTTP Request
+│  └─ FALSE Path: No Operation
+
+ACTION EXECUTION LAYER:
+├─ Actions (Set Node) - Position: [1080,380]
+├─ HTTP Request (POST) - Position: [1400,340]
+│  └─ URL: https://samirszamocki.app.n8n.cloud/webhook-test/159d84bd-45f5-43fb-9be9-9f8bc2ed6653
+├─ Pinned_Mock_action_data - Position: [1080,120]
+
+RESPONSE LAYER:
+├─ Chat output (Set Node) - Position: [920,700]
+└─ Respond to Webhook - Position: [1160,700]
+
+================================================================================
+SYSTEM PROMPT STRUCTURE
+================================================================================
+
+ROLE DEFINITION:
+"Expert property management agent acting on behalf of the landlord"
+
+TOOL ORCHESTRATION RULES:
+Step 1: ALWAYS call ContextAgent first (NEVER SKIP)
+Step 2: Convert query to concise vector search query
+Step 3: Send vector query to contractAgent  
+Step 4: Send vector query to classifierAgent
+Step 5: Use both responses to formulate final answer
+
+RESPONSE EXAMPLES (4 built-in scenarios):
+1. Mould Issue → Urgent landlord responsibility 
+2. Leaking Roof → High urgency structural repair
+3. No Heating/Hot Water → Urgent habitability issue
+4. Decorations → Permission required, low risk
+
+================================================================================
+EXECUTION FLOW SEQUENCE
+================================================================================
+
+1. CHAT TRIGGER ACTIVATION
+--------------------------
+Input: User message received via hosted chat
+Webhook Processing: c79e88b8-63f7-4721-b655-8aafd4eb221d
+Initial Message: "Hi there! 😋\nMy name is Nathan. How can I assist you today?"
+
+2. AI AGENT ORCHESTRATION
+-------------------------
+Agent Type: toolsAgent
+Model: gpt-4o-mini via OpenAI Chat Model5
+Memory: Window Buffer Memory (5 turns, session: 187a3d5d3eb44c06b2e3154710ca2ae7)
+
+STEP 1: ContextAgent Tool Call
+├─ Purpose: Gather clarification/context
+├─ Input: User query summary
+├─ Expected Output: JSON with is_clear, requires_context, etc.
+└─ Next: Proceed only if no further clarification needed
+
+STEP 2: Query Vectorization  
+├─ Convert user query to search keywords
+├─ Good: "pet policy rental agreement"
+└─ Bad: "What does my rental agreement say about pets?"
+
+STEP 3: ContractAgent Tool Call
+├─ Purpose: Search contract for relevant clauses
+├─ Input: Vector search query
+└─ Output: Contractual position and responsibilities
+
+STEP 4: ClassifierAgent Tool Call  
+├─ Purpose: Assess urgency and recommend actions
+├─ Input: Vector search query
+└─ Output: Urgency level and suggested next steps
+
+STEP 5: Response Generation
+├─ Synthesize: Context + Contract + Classification
+├─ Format: Landlord voice, professional tone
+└─ Include: Specific actions if required
+
+3. STRUCTURED OUTPUT PROCESSING
+-------------------------------
+AI Agent Raw Output → Basic LLM Chain
+
+PARSING PROMPT:
+"Turn the input into a structured JSON output. 'chat_output' is the chat input you receive, 'Query_summary' summarises the input (string), 'actions' summarises the actions mentioned in the input. If there is no discernible action mentioned in the input, then leave 'actions' blank."
+
+EXAMPLE TRANSFORMATION:
+Input: "I will notify the landlord right away and arrange for a qualified plumber..."
+Output: {
+  "chat_output": "[Full response text]",
+  "query_summary": "Hot water not working, high risk to tenant, landlords responsibility to fix", 
+  "actions": ["Notify landlord that hot water is broken", "Arrange for plumber to fix"]
+}
+
+Structured Parser Schema:
+{
+  "chat_output": "<Input chat received>",
+  "query_summary": "Hot water not working, high risk to tenant, landlords responsibility to fix",
+  "actions": ["Notify landlord", "Arrange for plumber to fix"]
+}
+
+4. CONDITIONAL ACTION PROCESSING
+--------------------------------
+IF Node Evaluation: $json.output.actions (array not empty?)
+
+TRUE PATH (Actions Exist):
+├─ Actions Set Node: Extract actions array
+├─ HTTP Request: POST to external webhook
+│  ├─ URL: https://samirszamocki.app.n8n.cloud/webhook-test/159d84bd-45f5-43fb-9be9-9f8bc2ed6653
+│  ├─ Body: {"Actions": [...]}
+│  └─ Purpose: Trigger external action execution system
+└─ No Operation (completion)
+
+FALSE PATH (No Actions):
+└─ No Operation (no external actions needed)
+
+5. RESPONSE DELIVERY
+--------------------
+Chat Output Processing:
+├─ Extract: $json.output.chat_output
+├─ Set Node: Prepare response for webhook
+└─ Respond to Webhook: Send chat_output to user
+
+================================================================================
+MEMORY MANAGEMENT SYSTEM
+================================================================================
+
+Window Buffer Memory Configuration:
+├─ Context Window: 5 conversation turns
+├─ Session ID: 187a3d5d3eb44c06b2e3154710ca2ae7 (fixed session)
+├─ Memory Key: "chat_history"
+└─ Persistence: Maintains context across tool calls
+
+Memory Integration Points:
+1. AI Agent: Loads conversation history before processing
+2. Tool Calls: Context passed to each sub-agent
+3. Response Generation: Historical context influences responses
+4. Memory Updates: New interactions automatically saved
+
+================================================================================
+TOOL WORKFLOW INTEGRATION
+================================================================================
+
+Context_agent Integration:
+├─ Workflow ID: BAa1dwbqTsN59O4s
+├─ Purpose: Ensure query completeness before proceeding
+├─ Input Schema: {query, chatInput}
+└─ Output: {is_clear, requires_context, query_summary, etc.}
+
+Contract_agent Integration:
+├─ Workflow ID: rg3M4eJbdkCAZPns  
+├─ Purpose: Vector search through rental agreement
+├─ Input: Converted search query
+└─ Output: Relevant contract clauses and responsibilities
+
+Classifier_agent Integration:
+├─ Workflow ID: iXHMrTw7UTJxLFdn
+├─ Purpose: Urgency assessment and action recommendations  
+├─ Input: Converted search query
+└─ Output: Risk level, urgency, suggested response approach
+
+================================================================================
+PINNED MOCK DATA (TESTING)
+================================================================================
+
+Mock Action Example:
+{
+  "output": {
+    "actions": [
+      "Notify landlord about the slippery tiles issue",
+      "Recommend using non-slip mats as a temporary safety measure", 
+      "Arrange for a maintenance inspection to address the slippery tiles"
+    ]
+  }
+}
+
+Purpose: Test action processing workflow without full agent execution
+
+================================================================================
+ORCHESTRATION INSIGHTS
+================================================================================
+
+1. SEQUENTIAL TOOL EXECUTION: Each tool call must complete before next step
+2. MEMORY CONTINUITY: Session-based context maintained across all interactions  
+3. STRUCTURED OUTPUT: Raw agent response always parsed into standardized format
+4. CONDITIONAL ACTIONS: External action system only triggered when actions exist
+5. DUAL OUTPUT PATHS: Chat response (immediate) + Actions (asynchronous processing)
+6. ERROR HANDLING: Retry mechanisms built into LLM chains
+7. WEBHOOK INTEGRATION: Both input (chat trigger) and output (action webhook) endpoints
+
+================================================================================
+CRITICAL EXECUTION DEPENDENCIES  
+================================================================================
+
+REQUIRED FOR SUCCESSFUL EXECUTION:
+✓ OpenAI API credentials (ce4Dko4ewvOjQLgW)
+✓ All 3 sub-agent workflows must be active and accessible
+✓ External action webhook endpoint must be responsive
+✓ Session memory persistence across tool calls
+✓ Structured output parser JSON schema validation
+
+FAILURE POINTS:
+✗ Sub-agent workflow unavailability
+✗ OpenAI API quota/rate limits  
+✗ Memory session conflicts
+✗ External webhook timeouts
+✗ JSON parsing failures in output structure
