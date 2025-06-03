@@ -10,6 +10,22 @@ when processing a tenant query.
 import os
 import sys
 
+# Load environment variables from backend/.env
+def load_env():
+    """Load environment variables from backend/.env"""
+    env_path = "backend/.env"
+    if os.path.exists(env_path):
+        with open(env_path, 'r') as f:
+            for line in f:
+                if '=' in line and not line.startswith('#'):
+                    key, value = line.strip().split('=', 1)
+                    os.environ[key] = value
+    else:
+        print("⚠️  Warning: backend/.env not found")
+
+# Load environment before any imports
+load_env()
+
 # Add the backend directory to the path
 sys.path.append('backend/api')
 

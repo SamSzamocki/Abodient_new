@@ -8,6 +8,10 @@ from langfuse.decorators import observe
 
 # Change from import-time initialization to lazy loading  
 _llm = None
+_pinecone_client = None
+_pinecone_index = None
+_embedder = None
+_vectorstore = None
 
 def get_llm():
     """Lazy-load the LLM to ensure environment variables are available"""
@@ -16,6 +20,18 @@ def get_llm():
         # gpt-4o-mini should always be the default model for all agents
         _llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0)
     return _llm
+
+def get_pinecone_components():
+    """Lazy-load Pinecone components to ensure environment variables are available"""
+    global _pinecone_client, _pinecone_index, _embedder, _vectorstore
+    
+    if _pinecone_client is None:
+        _pinecone_client = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+        _pinecone_index = _pinecone_client.Index("urgency-search")  # Matches n8n pineconeIndex
+        _embedder = OpenAIEmbeddings(model="text-embedding-3-small")
+        _vectorstore = PineconeVectorStore(index=_pinecone_index, embedding=_embedder)
+    
+    return _pinecone_client, _pinecone_index, _embedder, _vectorstore
 
 # Shared memory storage - matches n8n's shared session key
 session_memories = {}
@@ -54,14 +70,6 @@ NEVER recommend the tenant reach out or report an issue to the landlord
 
 Your tone must be helpful, clear and friendly"""
 
-# Pinecone configuration matching n8n exactly
-pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-index = pc.Index("urgency-search")  # Matches n8n pineconeIndex
-embedder = OpenAIEmbeddings(model="text-embedding-3-small")
-
-# Initialize embeddings and vector store
-vectorstore = PineconeVectorStore(index=index, embedding=embedder)
-
 @observe(name="classifier_agent")
 def run_classifier_agent(query: str, session_id: str = "187a3d5d3eb44c06b2e3154710ca2ae7") -> str:
     """
@@ -75,8 +83,9 @@ def run_classifier_agent(query: str, session_id: str = "187a3d5d3eb44c06b2e31547
     
     try:
         # Vector search - matches n8n's Vector Store Tool configuration exactly
+        pinecone_client, pinecone_index, embedder, vectorstore = get_pinecone_components()
         embedding = embedder.embed_query(query)
-        results = index.query(
+        results = pinecone_index.query(
             vector=embedding, 
             top_k=10,  # Matches n8n topK: 10
             include_metadata=True, 

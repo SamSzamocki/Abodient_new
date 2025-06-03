@@ -8,6 +8,12 @@
 
 **If you're an AI assistant starting fresh with this project, follow these steps in order:**
 
+#### Step 0: Read Recent Changes (CRITICAL)
+**Before proceeding with any other steps, you MUST read the recent change logs:**
+- Read `RECENT_CHANGE_LOGS.md` to understand what changes have been made recently
+- This will help you understand the current state and avoid redoing work
+- Pay special attention to any ongoing issues or incomplete work mentioned
+
 #### Step 1: Read This Entire Document
 This comprehensive guide contains all architectural details, agent specifications, API schemas, and development guidelines. Read it completely before proceeding.
 
@@ -87,6 +93,20 @@ After reading this guide, you MUST explore the actual codebase to understand imp
 2. Check Langfuse traces for full agent orchestration
 3. Verify all 4 agents (context, classifier, contract, main) are called
 4. Look for 15+ observations indicating proper tool usage
+
+#### Step 7: Change Log Management (IMPORTANT)
+**Before making any significant changes:**
+1. When you complete major fixes or implementations, ask the user: "Should I add these changes to the recent change logs?"
+2. Document key changes in `RECENT_CHANGE_LOGS.md` for future AI assistants
+3. Include: what was changed, why it was changed, and what the result was
+4. Remove outdated/irrelevant changes as the log gets long
+
+**Types of changes to log:**
+- Bug fixes and their root causes
+- New features or system enhancements
+- Architecture changes or refactoring
+- Environment or dependency updates
+- Performance improvements or optimizations
 
 ---
 

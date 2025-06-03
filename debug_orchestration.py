@@ -91,41 +91,60 @@ def lightweight_trace_analysis():
         try:
             observations = langfuse.fetch_observations(trace_id=trace.id, limit=50)
             
-            # Quick agent detection
+            # Quick agent detection - improved logic
             agent_calls = []
+            unique_agents = set()
+            
             for obs in observations.data:
                 obs_name = obs.name.lower()
-                if "classifier" in obs_name:
+                # More comprehensive agent detection
+                if "classifier" in obs_name or "classifierAgent" in obs.name:
                     agent_calls.append("classifier")
-                elif "context_agent" in obs_name:
+                    unique_agents.add("classifier")
+                elif "context" in obs_name and "agent" in obs_name:
                     agent_calls.append("context_agent")
-                elif "contract_agent" in obs_name:
+                    unique_agents.add("context_agent")
+                elif "contract" in obs_name and "agent" in obs_name:
                     agent_calls.append("contract_agent")
+                    unique_agents.add("contract_agent")
                 elif "main_agent" in obs_name:
                     agent_calls.append("main_agent")
+                    unique_agents.add("main_agent")
             
-            # Categorize orchestration pattern
-            if not agent_calls:
+            # Remove duplicates while preserving order
+            seen = set()
+            unique_agent_calls = []
+            for agent in agent_calls:
+                if agent not in seen:
+                    unique_agent_calls.append(agent)
+                    seen.add(agent)
+            
+            # Categorize orchestration pattern based on unique agents called
+            if not unique_agents:
                 agent_patterns["no_agents"] += 1
                 pattern = "❌ No agents called"
-            elif agent_calls == ["classifier"]:
+            elif unique_agents == {"classifier"}:
                 agent_patterns["classifier_only"] += 1
                 pattern = "⚠️  Classifier only"
-            elif len(set(agent_calls)) >= 3:
+            elif len(unique_agents & {"context_agent", "contract_agent", "classifier"}) >= 3:
                 agent_patterns["full_orchestration"] += 1
                 pattern = "✅ Full orchestration"
+            elif len(unique_agents & {"context_agent", "contract_agent", "classifier"}) >= 2:
+                agent_patterns["partial_orchestration"] += 1
+                pattern = f"⚡ Partial: {' → '.join(unique_agent_calls)}"
             else:
                 agent_patterns["partial_orchestration"] += 1
-                pattern = f"⚡ Partial: {' → '.join(agent_calls)}"
+                pattern = f"⚡ Partial: {' → '.join(unique_agent_calls)}"
             
             print(f"   Pattern: {pattern}")
-            print(f"   Agents: {' → '.join(agent_calls) if agent_calls else 'None'}")
+            print(f"   Agents: {' → '.join(unique_agent_calls) if unique_agent_calls else 'None'}")
+            print(f"   Debug: Found {len(observations.data)} observations, unique agents: {unique_agents}")
             
             trace_list.append({
                 "id": trace.id,
                 "timestamp": trace.timestamp,
                 "pattern": pattern,
-                "agents": agent_calls
+                "agents": unique_agent_calls
             })
             
         except Exception as e:
