@@ -6,8 +6,16 @@ from langchain.schema import HumanMessage, SystemMessage
 from langchain_pinecone import PineconeVectorStore
 from langfuse.decorators import observe
 
-# LLM configuration matching n8n
-llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0)
+# Change from import-time initialization to lazy loading
+_llm = None
+
+def get_llm():
+    """Lazy-load the LLM to ensure environment variables are available"""
+    global _llm
+    if _llm is None:
+        # gpt-4o-mini should always be the default model for all agents
+        _llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.3)
+    return _llm
 
 # Shared memory storage - matches n8n's shared session key
 session_memories = {}
@@ -15,10 +23,11 @@ session_memories = {}
 def get_shared_memory(session_id: str = "187a3d5d3eb44c06b2e3154710ca2ae7") -> ConversationBufferWindowMemory:
     """
     Get shared memory - matches n8n's Window Buffer Memory configuration
+    Uses "Take from previous node automatically" behavior from n8n
     """
     if session_id not in session_memories:
         session_memories[session_id] = ConversationBufferWindowMemory(
-            k=5,  # Window size
+            k=5,  # Window size - matches n8n default
             memory_key="chat_history",
             return_messages=True
         )
@@ -41,9 +50,9 @@ Your response to a query must include the full contractual position, clear stati
 
 Your tone must be helpful, clear and friendly"""
 
-# Pinecone configuration matching n8n
+# Pinecone configuration matching n8n exactly
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-index = pc.Index("contract-search")
+index = pc.Index("contract-search")  # Matches n8n pineconeIndex exactly
 embedder = OpenAIEmbeddings(model="text-embedding-3-small")
 
 # Initialize embeddings and vector store
@@ -52,7 +61,7 @@ vectorstore = PineconeVectorStore(index=index, embedding=embedder)
 @observe(name="contract_agent")
 def run_contract_agent(query: str, session_id: str = "187a3d5d3eb44c06b2e3154710ca2ae7") -> str:
     """
-    Contract agent that matches n8n contractAgent (2).json structure
+    Contract agent that matches n8n contractAgent (2).json structure exactly
     """
     print(f"[CONTRACT AGENT] Processing query: {query}")
     
@@ -60,13 +69,13 @@ def run_contract_agent(query: str, session_id: str = "187a3d5d3eb44c06b2e3154710
     memory = get_shared_memory(session_id)
     
     try:
-        # Vector search - matches n8n's Vector Store Tool configuration
+        # Vector search - matches n8n's Vector Store Tool configuration exactly
         embedding = embedder.embed_query(query)
         results = index.query(
             vector=embedding, 
             top_k=10,  # Matches n8n topK: 10
             include_metadata=True, 
-            namespace="contract-1"  # Matches n8n pineconeNamespace
+            namespace="contract-1"  # Matches n8n pineconeNamespace exactly
         )
         
         # Extract contract snippets
@@ -88,7 +97,8 @@ def run_contract_agent(query: str, session_id: str = "187a3d5d3eb44c06b2e3154710
         query_with_context = f"Query: {query}\ncontractInformation tool results:\n{snippets}"
         messages.append(HumanMessage(content=query_with_context))
         
-        # Generate response
+        # Generate response using lazy-loaded LLM
+        llm = get_llm()
         response = llm.invoke(messages)
         
         # Add to memory
@@ -99,5 +109,5 @@ def run_contract_agent(query: str, session_id: str = "187a3d5d3eb44c06b2e3154710
         return response.content
         
     except Exception as e:
-        print(f"[CONTRACT AGENT] Error: {str(e)}")
-        return "I apologize, but I encountered an error while searching the contract. Please try rephrasing your question."
+        print(f"[CONTRACT AGENT] Error: {e}")
+        return f"I apologize, but I encountered an error while analyzing the contract: {str(e)}"

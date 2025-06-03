@@ -7,15 +7,31 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langfuse.decorators import observe
 from .tools import ContextAgentTool, ContractAgentTool, ClassifierAgentTool, set_current_session_id
 
-# Initialize tools - these match the n8n tool configuration
-tools = [
-    ContextAgentTool(),
-    ContractAgentTool(),
-    ClassifierAgentTool()
-]
+# Change from import-time initialization to lazy loading
+_llm = None
 
-# LLM configuration - matches n8n OpenAI Chat Model
-llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.7)
+def get_llm():
+    """Lazy-load the LLM to ensure environment variables are available"""
+    global _llm
+    if _llm is None:
+        # gpt-4o-mini should always be the default model for all agents
+        _llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.7)
+    return _llm
+
+def create_tools():
+    """Create tools at runtime to avoid import-time failures"""
+    try:
+        tools = [
+            ContextAgentTool(),
+            ContractAgentTool(),
+            ClassifierAgentTool()
+        ]
+        print(f"[MAIN AGENT] Successfully created {len(tools)} tools")
+        return tools
+    except Exception as e:
+        print(f"[MAIN AGENT] ERROR creating tools: {e}")
+        # Return empty tools list to allow graceful degradation
+        return []
 
 # Shared memory storage - one memory per session_id
 session_memories = {}
@@ -38,6 +54,9 @@ def create_main_agent(session_id: str) -> AgentExecutor:
     """
     # Set the session ID for tools to use
     set_current_session_id(session_id)
+    
+    # Create tools at runtime to ensure they're properly initialized
+    tools = create_tools()
     
     # Get shared memory for this specific session
     memory = get_shared_memory(session_id)
@@ -145,7 +164,7 @@ Now Begin!"""
     ])
     
     # Create the agent
-    agent = create_openai_tools_agent(llm, tools, prompt)
+    agent = create_openai_tools_agent(get_llm(), tools, prompt)
     
     # Create agent executor with memory
     agent_executor = AgentExecutor(

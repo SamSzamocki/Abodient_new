@@ -6,8 +6,16 @@ from langchain.schema import HumanMessage, SystemMessage
 from langchain_pinecone import PineconeVectorStore
 from langfuse.decorators import observe
 
-# LLM configuration matching n8n
-llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0)
+# Change from import-time initialization to lazy loading  
+_llm = None
+
+def get_llm():
+    """Lazy-load the LLM to ensure environment variables are available"""
+    global _llm
+    if _llm is None:
+        # gpt-4o-mini should always be the default model for all agents
+        _llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0)
+    return _llm
 
 # Shared memory storage - matches n8n's shared session key
 session_memories = {}
@@ -15,10 +23,11 @@ session_memories = {}
 def get_shared_memory(session_id: str = "187a3d5d3eb44c06b2e3154710ca2ae7") -> ConversationBufferWindowMemory:
     """
     Get shared memory - matches n8n's Window Buffer Memory configuration
+    Uses "Take from previous node automatically" behavior from n8n
     """
     if session_id not in session_memories:
         session_memories[session_id] = ConversationBufferWindowMemory(
-            k=5,  # Window size
+            k=5,  # Window size - matches n8n default
             memory_key="chat_history",
             return_messages=True
         )
@@ -45,9 +54,9 @@ NEVER recommend the tenant reach out or report an issue to the landlord
 
 Your tone must be helpful, clear and friendly"""
 
-# Pinecone configuration matching n8n
+# Pinecone configuration matching n8n exactly
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-index = pc.Index("urgency-search")
+index = pc.Index("urgency-search")  # Matches n8n pineconeIndex
 embedder = OpenAIEmbeddings(model="text-embedding-3-small")
 
 # Initialize embeddings and vector store
@@ -56,7 +65,8 @@ vectorstore = PineconeVectorStore(index=index, embedding=embedder)
 @observe(name="classifier_agent")
 def run_classifier_agent(query: str, session_id: str = "187a3d5d3eb44c06b2e3154710ca2ae7") -> str:
     """
-    Classifier agent that matches n8n classifierAgent (3).json structure
+    Classifier agent that matches n8n classifierAgent (3).json structure exactly
+    Returns a plain text paragraph, NOT structured JSON (unlike context agent)
     """
     print(f"[CLASSIFIER AGENT] Processing query: {query}")
     
@@ -64,7 +74,7 @@ def run_classifier_agent(query: str, session_id: str = "187a3d5d3eb44c06b2e31547
     memory = get_shared_memory(session_id)
     
     try:
-        # Vector search - matches n8n's Vector Store Tool configuration
+        # Vector search - matches n8n's Vector Store Tool configuration exactly
         embedding = embedder.embed_query(query)
         results = index.query(
             vector=embedding, 
@@ -92,15 +102,16 @@ def run_classifier_agent(query: str, session_id: str = "187a3d5d3eb44c06b2e31547
         query_with_context = f"Query: {query}\nclassifierInformation tool results:\n{snippets}"
         messages.append(HumanMessage(content=query_with_context))
         
-        # Generate response
+        # Generate response using lazy-loaded LLM - returns simple text, not JSON
+        llm = get_llm()
         response = llm.invoke(messages)
         
         # Add to memory
         memory.chat_memory.add_user_message(query)
         memory.chat_memory.add_ai_message(response.content)
         
-        print(f"[CLASSIFIER AGENT] Generated response")
-        return response.content
+        print(f"[CLASSIFIER AGENT] Generated paragraph response")
+        return response.content  # Return plain text paragraph as per n8n specification
         
     except Exception as e:
         print(f"[CLASSIFIER AGENT] Error: {str(e)}")

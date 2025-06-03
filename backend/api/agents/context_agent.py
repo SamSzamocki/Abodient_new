@@ -21,8 +21,16 @@ class ContextResponse(BaseModel):
 # Initialize the JSON output parser with the Pydantic model
 parser = JsonOutputParser(pydantic_object=ContextResponse)
 
-# LLM configuration
-llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.3)
+# Change from import-time initialization to lazy loading
+_llm = None
+
+def get_llm():
+    """Lazy-load the LLM to ensure environment variables are available"""
+    global _llm
+    if _llm is None:
+        # gpt-4o-mini should always be the default model for all agents
+        _llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.3)
+    return _llm
 
 # Memory storage - shared across calls
 memory_storage = {}
@@ -165,7 +173,8 @@ def run_context_agent(query: str, session_id: str = "187a3d5d3eb44c06b2e3154710c
             partial_variables={"format_instructions": parser.get_format_instructions()}
         )
         
-        # Build the chain: prompt -> llm -> parser
+        # Build the chain: prompt -> llm -> parser (use lazy-loaded LLM)
+        llm = get_llm()
         chain = prompt | llm | parser
         
         # Load conversation history for context (but don't include in the main prompt)

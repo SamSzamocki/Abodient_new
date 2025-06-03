@@ -1,0 +1,62 @@
+[
+  {
+    "session_id": "frontend-session",
+    "sender": "ai",
+    "message": "You've said 'yesterday.' Can you provide more context or details about what you're referring to, especially in relation to your tenancy?",
+    "timestamp": "2025-05-26 10:44:18.83116"
+  },
+  {
+    "session_id": "frontend-session",
+    "sender": "user",
+    "message": "yestserday",
+    "timestamp": "2025-05-26 10:44:15.459215"
+  },
+  {
+    "session_id": "frontend-session",
+    "sender": "ai",
+    "message": "I understand that your door handle is broken. To help address the situation, could you specify which door handle is broken, and when did you first notice the issue?",
+    "timestamp": "2025-05-26 10:44:07.656253"
+  },
+  {
+    "session_id": "frontend-session",
+    "sender": "user",
+    "message": "door handle broken",
+    "timestamp": "2025-05-26 10:44:02.458608"
+  },
+  {
+    "session_id": "frontend-session",
+    "sender": "ai",
+    "message": "I apologize, but I encountered an error processing your request. Could you please rephrase your question?",
+    "timestamp": "2025-05-26 10:18:09.924914"
+  },
+  {
+    "session_id": "frontend-session",
+    "sender": "user",
+    "message": "floorboards cracked",
+    "timestamp": "2025-05-26 10:18:08.571218"
+  },
+  {
+    "session_id": "frontend-session",
+    "sender": "ai",
+    "message": "I understand that your floorboards are cracked. To better assist you, could you tell me how long the cracks have been there and if they have gotten worse over time? Also, are the cracks limited to specific areas or throughout the entire flooring?",
+    "timestamp": "2025-05-26 06:11:14.547975"
+  },
+  {
+    "session_id": "frontend-session",
+    "sender": "user",
+    "message": "floorboards are cracked",
+    "timestamp": "2025-05-26 06:11:10.603167"
+  },
+  {
+    "session_id": "frontend-session",
+    "sender": "ai",
+    "message": "You've greeted me with 'hi.' Are you seeking assistance with a tenancy-related issue or have a question about your rental situation? Please clarify.",
+    "timestamp": "2025-05-26 06:11:00.376001"
+  },
+  {
+    "session_id": "frontend-session",
+    "sender": "user",
+    "message": "hi",
+    "timestamp": "2025-05-26 06:10:57.381749"
+  }
+]
