@@ -47,11 +47,11 @@ After reading this guide, you MUST explore the actual codebase to understand imp
 - **Key Metrics**: Agent orchestration success rate, tool calling patterns
 - **Common Issues**: Agent initialization failures, tool availability problems
 
-**Debugging Workflow:**
-1. Check Langfuse traces for failed agent orchestrations
-2. Run `debug_orchestration.py` for detailed analysis
-3. Look for patterns in successful vs failed traces
-4. Focus on tool initialization and environment loading issues
+**Debugging Workflow (Logical Order):**
+1. **Basic connectivity**: Verify API server running (`curl localhost:8000/`)
+2. **Functional test**: Test agent orchestration (`run_system.py --test`)
+3. **IF issues found**: Analyze traces (`debug_orchestration.py`)
+4. **Deep dive**: Focus on tool initialization and environment loading issues
 
 #### Step 4: n8n Documentation Context
 **Important**: This system was originally prototyped in n8n (LangChain JS) but is now implemented in Python. n8n workflows in this repo are for **reference only**.
@@ -82,17 +82,21 @@ After reading this guide, you MUST explore the actual codebase to understand imp
 - ✅ All dependencies in requirements.txt
 
 #### Step 6: Development Environment Setup
-**Before making changes:**
-1. Ensure API server running on `localhost:8000`
-2. Verify all environment variables loaded (OpenAI, Pinecone, Langfuse)
-3. Check browser MCP tools available if needed
-4. Test agent orchestration with simple queries first
+**Before making changes (Docker-First Approach):**
+1. **Check if Docker is already running**: `docker ps` (primary deployment method)
+2. **If Docker running**: API server is on `localhost:8000`, skip to step 4
+3. **If Docker not running**: Start with `docker-compose up -d` OR use `run_system.py --backend` for development
+4. Verify all environment variables loaded (OpenAI, Pinecone, Langfuse)
+5. Check browser MCP tools available if needed
 
-**Testing Approach:**
-1. Make a simple query via `/main-agent` endpoint
-2. Check Langfuse traces for full agent orchestration
-3. Verify all 4 agents (context, classifier, contract, main) are called
-4. Look for 15+ observations indicating proper tool usage
+**Testing Approach (Docker-Aware Order):**
+1. **Check current deployment**: `docker ps` (see if containers already running)
+2. **Quick connectivity check**: `curl localhost:8000/` (verify backend responding)
+3. **Comprehensive test**: `run_system.py --test` (tests all agents + connectivity)
+4. **IF problems found**: Use `debug_orchestration.py` for trace analysis
+5. **IF still issues**: Manual `/main-agent` endpoint testing with specific queries
+
+**Important**: This system primarily runs via Docker Compose. Always check `docker ps` first to avoid port conflicts when starting development servers.
 
 #### Step 7: Change Log Management (IMPORTANT)
 **Before making any significant changes:**
@@ -107,6 +111,33 @@ After reading this guide, you MUST explore the actual codebase to understand imp
 - Architecture changes or refactoring
 - Environment or dependency updates
 - Performance improvements or optimizations
+
+#### Step 8: System Prompt Protection Protocol (CRITICAL)
+**⚠️ NEVER modify agent system prompts without explicit permission:**
+
+1. **System prompts are VERBATIM copies from n8n workflows** - they define the exact agent behavior and workflow logic
+2. **Files containing system prompts:**
+   - `backend/api/agents/main_agent.py` - Main orchestration workflow
+   - `backend/api/agents/context_agent.py` - Context checking logic
+   - `backend/api/agents/contract_agent.py` - Contract search behavior
+   - `backend/api/agents/classifier.py` - Classification logic
+
+3. **Before ANY changes to system prompts:**
+   - **EXPLICITLY state** that you are proposing to modify a system prompt
+   - **Explain WHY** the change is necessary
+   - **REQUEST PERMISSION** from the user before proceeding
+   - **Never include system prompt changes** in general code updates without calling them out
+
+4. **System prompt changes can break:**
+   - Agent orchestration workflow
+   - n8n compatibility 
+   - Expected agent behavior patterns
+   - Integration between agents
+
+**Example of correct approach:**
+> "I need to modify the main agent's system prompt to fix the workflow issue. This will change how the agent processes requests. May I proceed with updating the system prompt in `main_agent.py`?"
+
+**❌ Never do this:** Silently update system prompts as part of other changes
 
 ---
 
@@ -158,9 +189,11 @@ The system follows a microservices architecture with these main components:
 
 ### Key Architecture Decisions:
 - **Separation of Concerns**: Each agent handles a specific domain (context, classification, contracts)
-- **Shared Memory**: Agents share conversation memory for context continuity
+- **Scoped Memory Architecture**: Each agent has isolated memory channels preventing cross-contamination
+- **Memory Channel Isolation**: User conversations and agent-to-agent conversations are completely separate
 - **Vector Search**: Pinecone enables semantic search through contracts and classification data
-- **Session Management**: Each conversation has a unique session ID for history tracking
+- **Session Management**: Each conversation has a unique session ID with isolated memory across all channels
+- **n8n Architecture Compliance**: Memory scoping matches n8n conversation patterns exactly
 
 ## 3. Core Components
 
@@ -169,13 +202,20 @@ The system follows a microservices architecture with these main components:
 - **API Key authentication** for security
 - **Database integration** using SQLAlchemy ORM
 - **OpenTelemetry** instrumentation for observability
+- **Scoped Memory Management** with isolated conversation channels
 
 ### 3.2 Agent System (`backend/api/agents/`)
-Four specialized agents work together:
-1. **Context Agent**: Ensures queries have sufficient detail
-2. **Classifier Agent**: Determines urgency and responsibility
-3. **Contract Agent**: Searches rental agreements for relevant clauses
-4. **Main Agent**: Orchestrates the workflow and generates responses
+Four specialized agents work together with scoped memory isolation:
+1. **Context Agent**: Ensures queries have sufficient detail (isolated memory channel)
+2. **Classifier Agent**: Determines urgency and responsibility (isolated memory channel)
+3. **Contract Agent**: Searches rental agreements for relevant clauses (isolated memory channel)
+4. **Main Agent**: Orchestrates the workflow and generates responses (user conversation memory)
+
+### 3.3 Memory System (`backend/api/memory/`)
+- **ScopedMemoryManager**: Centralized memory management with conversation channel isolation
+- **Memory Channels**: Separate channels for user conversations and agent-to-agent communications
+- **Session Management**: Activity tracking and statistics for session lifecycle management
+- **n8n Architecture Compliance**: Matches n8n conversation scoping patterns exactly
 
 ### 3.3 Frontend (`frontend/`)
 - **React with TypeScript** for type safety
@@ -197,9 +237,10 @@ Four specialized agents work together:
 
 **Key Features**:
 - Uses LangChain's OpenAI Tools Agent
-- Maintains conversation memory (last 5 exchanges)
+- Maintains user conversation memory (window: 10 messages)
 - Follows a strict 5-step workflow
 - Temperature: 0.7 (balanced creativity)
+- **Scoped Memory**: Uses dedicated user memory channel, isolated from agent-to-agent communications
 
 **Workflow**:
 ```python
@@ -217,6 +258,8 @@ Four specialized agents work together:
 - Structured JSON output using Pydantic models
 - Checks for the "5 W's": What, Where, When, How, Prior Attempts
 - Temperature: 0.3 (more deterministic)
+- **Scoped Memory**: Uses isolated memory channel for Main Agent ↔ Context Agent conversations
+- **Fixed Memory Integration**: Now properly includes conversation history in prompts
 
 **Response Structure**:
 ```json
@@ -239,6 +282,7 @@ Four specialized agents work together:
 - Namespace: "urgency-1"
 - Returns urgency levels and responsibility assignments
 - Temperature: 0 (fully deterministic)
+- **Scoped Memory**: Uses isolated memory channel for Main Agent ↔ Classifier Agent conversations
 
 **Classification Categories**:
 - **Urgent**: Health/safety risks, habitability issues
@@ -254,6 +298,7 @@ Four specialized agents work together:
 - Namespace: "contract-1"
 - Returns specific contract sections
 - Temperature: 0 (fully deterministic)
+- **Scoped Memory**: Uses isolated memory channel for Main Agent ↔ Contract Agent conversations
 
 ## 5. Data Flow and Workflow
 
@@ -273,11 +318,29 @@ Four specialized agents work together:
 7. UI updates with new message
 ```
 
-### 5.2 Memory Management
-- **Window Buffer Memory**: Keeps last 5 conversation turns
-- **Session-based**: Each session_id has isolated memory
+### 5.2 Memory Management (Updated: Scoped Memory Architecture)
+- **Scoped Memory Manager**: Unified memory management with isolated conversation channels
+- **Memory Isolation**: Each agent has separate memory for its conversation thread with main agent
+- **User Memory**: User ↔ Main Agent conversations (window: 10 messages)
+- **Agent Memory**: Main Agent ↔ Specialist Agent conversations (window: 5 messages each)
+- **Session-based**: Each session_id has isolated memory across all channels
 - **Persistence**: Chat history stored in PostgreSQL
-- **Shared across agents**: All agents access same memory
+- **Activity Tracking**: Session activity tracked for cleanup management
+
+**Memory Channel Structure**:
+```python
+# Get memory for different conversation types
+user_memory = get_user_memory(session_id)                    # User ↔ Main Agent
+context_memory = get_agent_memory(session_id, "context")     # Main ↔ Context Agent  
+contract_memory = get_agent_memory(session_id, "contract")   # Main ↔ Contract Agent
+classifier_memory = get_agent_memory(session_id, "classifier") # Main ↔ Classifier Agent
+```
+
+**Key Benefits**:
+- **Perfect Isolation**: User conversations never contaminate agent-to-agent conversations
+- **Session Separation**: Different users maintain completely separate memories
+- **n8n Architecture Match**: Replicates n8n conversation scoping behavior exactly
+- **Scalable**: Activity tracking enables future session cleanup implementation
 
 ## 6. Technology Stack
 
@@ -292,6 +355,7 @@ Four specialized agents work together:
 - **Redis** - Caching and queuing
 - **Langfuse** - LLM observability
 - **OpenTelemetry** - Distributed tracing
+- **ScopedMemoryManager** - Custom memory isolation system for conversation channels
 
 ### Frontend
 - **React 18** - UI framework
@@ -506,11 +570,40 @@ These workflows can be imported into n8n for visual workflow management and exec
 4. Test responsive design
 
 ### 13.4 Testing Considerations
-- Test agent interactions with mock responses
-- Verify session isolation
-- Check vector search relevance
-- Validate JSON response structures
-- Test error handling paths
+- **Memory Isolation Testing**: Verify scoped memory works correctly with comprehensive test suite
+- **Agent Integration Testing**: Test agent interactions with mock responses
+- **Session Isolation**: Verify session isolation across memory channels
+- **Vector Search**: Check vector search relevance
+- **JSON Structures**: Validate JSON response structures
+- **Error Handling**: Test error handling paths
+- **Memory Channel Testing**: Ensure user and agent conversations remain isolated
+
+### 13.5 Running Tests
+**Comprehensive Test Suite** (recommended):
+```bash
+cd backend
+python -m pytest tests/ -v
+```
+
+**Quick Test Script** (no pytest dependency):
+```bash
+cd backend
+python test_scoped_memory_simple.py
+```
+
+**Agent Integration Test**:
+```bash
+cd backend
+python test_agent_integration.py
+```
+
+**Test Coverage**:
+- 19 unit tests for ScopedMemoryManager functionality
+- 4 integration tests with real agents
+- Memory isolation verification
+- n8n conversation scoping compliance
+- Session activity tracking
+- All tests passing (23/23 total)
 
 ---
 

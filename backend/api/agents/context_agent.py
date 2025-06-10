@@ -3,10 +3,14 @@ from langchain_openai import ChatOpenAI
 from langchain.memory import ConversationBufferWindowMemory
 from langchain.schema import HumanMessage, SystemMessage
 from langchain_core.output_parsers import JsonOutputParser
-from langchain_core.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate, ChatPromptTemplate, MessagesPlaceholder
 from pydantic import BaseModel, Field
 from typing import Optional
 from langfuse.decorators import observe
+from memory.scoped_memory_manager import get_agent_memory
+from langchain_community.vectorstores import FAISS
+from langchain_openai import OpenAIEmbeddings
+from langchain.chains import RetrievalQA
 
 # Define the expected response structure
 class ContextResponse(BaseModel):
@@ -32,34 +36,29 @@ def get_llm():
         _llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.3)
     return _llm
 
-# Memory storage - shared across calls
-memory_storage = {}
+# Note: Replaced global memory_storage with scoped memory manager
+# This ensures context agent only sees main agent ↔ context agent conversations
 
 def get_shared_memory(session_id: str = "187a3d5d3eb44c06b2e3154710ca2ae7") -> ConversationBufferWindowMemory:
     """
-    Get shared memory - matches n8n's Window Buffer Memory configuration
+    Get memory for main agent ↔ context agent conversations only.
+    Now uses scoped memory manager to ensure conversation isolation.
     """
-    if session_id not in memory_storage:
-        memory_storage[session_id] = ConversationBufferWindowMemory(
-            k=5,  # Window size
-            memory_key="chat_history",
-            return_messages=True
-        )
-    return memory_storage[session_id]
+    return get_agent_memory(session_id, "context")
 
-# EXACT system prompt from n8n ContextAgent.json with structured output instructions
+# VERBATIM system prompt from n8n contextAgent.json with structured output instructions
 SYSTEM_PROMPT = """### **Role**
 
-You are an expert at ensuring tenant queries contain all the necessary context to facilitate a resolution. Your goal is to assess each query and gather sufficient **clarifying** and **contextual** information before marking it as complete.
+You are an expert at ensuring tenant property queries contain all the necessary context to facilitate a resolution. Your goal is to assess each query and gather sufficient **clarifying** and **contextual** information before marking it as complete.
 
 ### **Your Responsibilities:**
 
-For each tenant query, follow these steps:
+For each tenant query you receive, follow these steps:
 
 1. **Determine if the question is clear and relevant to a tenancy issue.**
     - If unclear or possibly unrelated, ask **one clarifying question** to confirm intent.
     - If the user confirms relevance, proceed as if it was always relevant.
-2. **Always gather sufficient context before finalizing the response.**
+2. **Ask clarifying questions until the query is **fully understood** and you have all the context
     - No issue should be considered **fully understood** unless the following key facts have been collected:
         - **What**: What is the exact problem? (e.g., is something broken, missing, malfunctioning?)
         - **Where**: Where is this happening? (e.g., which room, which part of the property?)
@@ -76,14 +75,15 @@ Your response must strictly follow this JSON structure:
 
 ```json
 {{
-  "is_clear": true|false,
-  "is_relevant": true|false,
-  "requires_clarification": true|false,
+  "is_clear": <true|false>,
+  "is_relevant": <true|false>,
+  "requires_clarification": <true|false>,
   "clarifying_question": "",
-  "requires_context": true|false,
+  "requires_context": <true|false>,
   "additional_context_question": "",
   "query_summary": "A summary of the user's issue, incorporating all gathered details."
 }}
+
 ```
 
 ### **Response Rules:**
@@ -114,6 +114,7 @@ Your response must strictly follow this JSON structure:
   "additional_context_question": "",
   "query_summary": "User states their lock is broken."
 }}
+
 ```
 
 ❌ **Problem:** This fails to collect necessary details (e.g., which lock, whether they can still enter, whether they've tried anything).
@@ -130,6 +131,7 @@ Your response must strictly follow this JSON structure:
   "additional_context_question": "Which lock is broken? Are you currently unable to lock or unlock your door? When did the issue start? Have you tried anything to fix it?",
   "query_summary": "User reports a broken lock but more details are needed to determine severity and next steps."
 }}
+
 ```
 
 ---
@@ -150,6 +152,7 @@ Your response must strictly follow this JSON structure:
   "additional_context_question": "",
   "query_summary": "User reports a kitchen sink leak that started yesterday. Water is pooling under the cabinet. They attempted to tighten the pipe, but the issue persists."
 }}
+
 ```
 
 {format_instructions}
@@ -166,27 +169,32 @@ def run_context_agent(query: str, session_id: str = "187a3d5d3eb44c06b2e3154710c
         # Get shared memory
         memory = get_shared_memory(session_id)
         
-        # Create prompt template with format instructions
-        prompt = PromptTemplate(
-            template=SYSTEM_PROMPT + "\n\nUser Query: {query}",
-            input_variables=["query"],
-            partial_variables={"format_instructions": parser.get_format_instructions()}
-        )
+        # Create prompt template with memory and format instructions
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", SYSTEM_PROMPT + "\n\n{format_instructions}"),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("human", "User Query: {query}")
+        ])
         
         # Build the chain: prompt -> llm -> parser (use lazy-loaded LLM)
         llm = get_llm()
         chain = prompt | llm | parser
         
-        # Load conversation history for context (but don't include in the main prompt)
+        # Load conversation history for context
         try:
             memory_vars = memory.load_memory_variables({})
-            if "chat_history" in memory_vars and memory_vars["chat_history"]:
-                print(f"[CONTEXT AGENT] Loaded {len(memory_vars['chat_history'])} messages from memory")
+            chat_history = memory_vars.get("chat_history", [])
+            print(f"[CONTEXT AGENT] Using {len(chat_history)} messages from memory")
         except Exception as e:
             print(f"[CONTEXT AGENT] Memory load error: {e}")
+            chat_history = []
         
-        # Generate response using structured parsing
-        result = chain.invoke({"query": query})
+        # Generate response using structured parsing with memory context
+        result = chain.invoke({
+            "query": query,
+            "chat_history": chat_history,
+            "format_instructions": parser.get_format_instructions()
+        })
         
         # Add to memory
         memory.chat_memory.add_user_message(query)

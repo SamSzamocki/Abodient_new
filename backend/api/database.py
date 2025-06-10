@@ -1,4 +1,5 @@
-from sqlalchemy.orm import Session
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey, Text
+from sqlalchemy.orm import sessionmaker, declarative_base, relationship, Session
 from models import ConversationMessage, SessionMemory
 import uuid
 from datetime import datetime

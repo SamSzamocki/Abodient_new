@@ -1,12 +1,14 @@
-from fastapi import FastAPI, Header, HTTPException, Depends
-from fastapi.middleware.cors import CORSMiddleware
 import os
-from sqlalchemy.orm import Session
+import uuid
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, Header
+from fastapi.middleware.cors import CORSMiddleware
 from database import get_db, create_message, get_chat_history
 from models import Base, engine
+from agents.classifier import run_classifier_agent as classify
+from otel_config import setup_telemetry
+from sqlalchemy.orm import Session
 
 # Initialize OpenTelemetry BEFORE importing other modules
-from otel_config import setup_telemetry
 setup_telemetry()
 
 # Create database tables
@@ -35,7 +37,6 @@ async def root():
 
 # ---------- endpoints ----------
 from pydantic import BaseModel
-from agents.classifier import classify
 from agents.context_agent import run_context_agent
 from agents.main_agent import handle_message
 from agents.contract_agent import run_contract_agent as check_contract

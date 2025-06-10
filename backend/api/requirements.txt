@@ -15,7 +15,7 @@ python-multipart  # For handling file uploads
 aiofiles  # For async file operations
 psycopg2-binary  # PostgreSQL adapter for Python
 sqlalchemy  # SQL toolkit and ORM
-langfuse
+langfuse==2.60.5
 redis
 opentelemetry-sdk
 opentelemetry-exporter-otlp

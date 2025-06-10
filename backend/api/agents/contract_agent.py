@@ -5,6 +5,7 @@ from langchain.memory import ConversationBufferWindowMemory
 from langchain.schema import HumanMessage, SystemMessage
 from langchain_pinecone import PineconeVectorStore
 from langfuse.decorators import observe
+from memory.scoped_memory_manager import get_agent_memory
 
 # Change from import-time initialization to lazy loading
 _llm = None
@@ -33,21 +34,15 @@ def get_pinecone_components():
     
     return _pinecone_client, _pinecone_index, _embedder, _vectorstore
 
-# Shared memory storage - matches n8n's shared session key
-session_memories = {}
+# Note: Replaced global session_memories with scoped memory manager
+# This ensures contract agent only sees main agent ↔ contract agent conversations
 
 def get_shared_memory(session_id: str = "187a3d5d3eb44c06b2e3154710ca2ae7") -> ConversationBufferWindowMemory:
     """
-    Get shared memory - matches n8n's Window Buffer Memory configuration
-    Uses "Take from previous node automatically" behavior from n8n
+    Get memory for main agent ↔ contract agent conversations only.
+    Now uses scoped memory manager to ensure conversation isolation.
     """
-    if session_id not in session_memories:
-        session_memories[session_id] = ConversationBufferWindowMemory(
-            k=5,  # Window size - matches n8n default
-            memory_key="chat_history",
-            return_messages=True
-        )
-    return session_memories[session_id]
+    return get_agent_memory(session_id, "contract")
 
 # EXACT system prompt from n8n contractAgent (2).json
 SYSTEM_PROMPT = """You are an expert in analysing tenancy contracts to help answer user queries. 
