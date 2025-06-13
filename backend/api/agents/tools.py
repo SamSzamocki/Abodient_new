@@ -1,7 +1,7 @@
 from langchain.tools import BaseTool
 from typing import Type
 from pydantic import BaseModel, Field
-from .context_agent import run_context_agent
+from .context_agent import run_context_agent_with_dual_memory
 from .contract_agent import run_contract_agent  
 from .classifier import run_classifier_agent
 
@@ -26,10 +26,10 @@ class ContextAgentTool(BaseTool):
     args_schema: Type[BaseModel] = ContextAgentInput
 
     def _run(self, query: str) -> str:
-        """Execute the context agent with shared memory"""
+        """Execute the context agent with dual memory access"""
         try:
             session_id = get_current_session_id()
-            result = run_context_agent(query, session_id)
+            result = run_context_agent_with_dual_memory(query, session_id)
             return str(result)
         except Exception as e:
             return f"Error calling context agent: {str(e)}"

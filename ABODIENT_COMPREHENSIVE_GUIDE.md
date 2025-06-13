@@ -49,8 +49,8 @@ After reading this guide, you MUST explore the actual codebase to understand imp
 
 **Debugging Workflow (Logical Order):**
 1. **Basic connectivity**: Verify API server running (`curl localhost:8000/`)
-2. **Functional test**: Test agent orchestration (`run_system.py --test`)
-3. **IF issues found**: Analyze traces (`debug_orchestration.py`)
+2. **Functional test**: Test agent orchestration (`tools/system/run_system.py --test`)
+3. **IF issues found**: Analyze traces (`tools/debug/debug_orchestration.py`)
 4. **Deep dive**: Focus on tool initialization and environment loading issues
 
 #### Step 4: n8n Documentation Context
@@ -85,15 +85,15 @@ After reading this guide, you MUST explore the actual codebase to understand imp
 **Before making changes (Docker-First Approach):**
 1. **Check if Docker is already running**: `docker ps` (primary deployment method)
 2. **If Docker running**: API server is on `localhost:8000`, skip to step 4
-3. **If Docker not running**: Start with `docker-compose up -d` OR use `run_system.py --backend` for development
+3. **If Docker not running**: Start with `docker-compose up -d` OR use `tools/system/run_system.py --backend` for development
 4. Verify all environment variables loaded (OpenAI, Pinecone, Langfuse)
 5. Check browser MCP tools available if needed
 
 **Testing Approach (Docker-Aware Order):**
 1. **Check current deployment**: `docker ps` (see if containers already running)
 2. **Quick connectivity check**: `curl localhost:8000/` (verify backend responding)
-3. **Comprehensive test**: `run_system.py --test` (tests all agents + connectivity)
-4. **IF problems found**: Use `debug_orchestration.py` for trace analysis
+3. **Comprehensive test**: `tools/system/run_system.py --test` (tests all agents + connectivity)
+4. **IF problems found**: Use `tools/debug/debug_orchestration.py` for trace analysis
 5. **IF still issues**: Manual `/main-agent` endpoint testing with specific queries
 
 **Important**: This system primarily runs via Docker Compose. Always check `docker ps` first to avoid port conflicts when starting development servers.
@@ -138,6 +138,45 @@ After reading this guide, you MUST explore the actual codebase to understand imp
 > "I need to modify the main agent's system prompt to fix the workflow issue. This will change how the agent processes requests. May I proceed with updating the system prompt in `main_agent.py`?"
 
 **❌ Never do this:** Silently update system prompts as part of other changes
+
+---
+
+## 🚨 **Critical Recent Changes (Last 90 Days)**
+
+<!--
+WHAT THIS SECTION IS:
+This section contains the most critical system changes that AI assistants need to understand immediately.
+It provides quick context on recent enhancements, fixes, and warnings about things that would break the system.
+
+REFRESH STRATEGY:
+- Keep changes from last 90 days that are architecturally significant
+- Archive minor bug fixes after 30 days
+- Keep forever: Major architecture changes, system-breaking fixes, critical warnings
+- Remove: Resolved minor issues, detailed debugging sessions, failed experiments
+- Update quarterly: Move detailed histories to RECENT_CHANGE_LOGS.md
+-->
+
+### **Dual Memory Context Agent Enhancement (June 2025)**
+- **What**: Context agent can now track partial user information across conversation turns, eliminating repetitive questioning
+- **Key Enhancement**: Added dual memory access allowing context agent to see both user conversations AND agent summaries
+- **Files**: `context_agent.py` (new `run_context_agent_with_dual_memory()`), `scoped_memory_manager.py`, `tools.py`
+- **⚠️ Critical**: Don't modify original `run_context_agent()` function - needed for backward compatibility
+
+### **Scoped Memory Architecture (January 2025)** 
+- **What**: Complete memory system overhaul with isolated conversation channels per agent type
+- **Key Enhancement**: Each agent has separate memory threads preventing cross-contamination
+- **Files**: All agent files updated, new `memory/` directory with `ScopedMemoryManager`
+- **⚠️ Critical**: Don't revert to old global memory dictionaries - causes memory leaks and conversation cross-contamination
+- **Verification**: Run `test_scoped_memory_simple.py` to confirm isolation working
+
+### **Docker Import Path Resolution (June 2025)**
+- **What**: Fixed fundamental module import failures in Docker containers
+- **Key Fix**: Changed all imports from `api.module` to `module` format for container compatibility
+- **Files**: All agent files (`main_agent.py`, `context_agent.py`, `contract_agent.py`, `classifier.py`), `database.py`
+- **⚠️ Critical**: Don't revert import paths to `api.` prefix - will break Docker container startup
+- **Verification**: `docker-compose up` should start cleanly without import errors
+
+**📚 Full Change History**: See `RECENT_CHANGE_LOGS.md` for complete implementation details and testing evidence.
 
 ---
 

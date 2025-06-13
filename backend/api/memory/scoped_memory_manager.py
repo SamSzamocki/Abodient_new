@@ -177,4 +177,26 @@ def get_user_memory(session_id: str) -> ConversationBufferWindowMemory:
 
 def get_agent_memory(session_id: str, agent_type: str) -> ConversationBufferWindowMemory:
     """Convenience function to get agent memory for a session"""
-    return get_scoped_memory_manager().get_agent_memory(session_id, agent_type) 
+    return get_scoped_memory_manager().get_agent_memory(session_id, agent_type)
+
+
+def get_dual_memory_for_agent(session_id: str, agent_type: str) -> tuple[ConversationBufferWindowMemory, ConversationBufferWindowMemory]:
+    """
+    Get both user memory and agent-specific memory for dual memory access.
+    
+    This enables agents to see both:
+    1. User ↔ Main Agent conversations (actual user responses)
+    2. Main Agent ↔ Specific Agent conversations (structured summaries)
+    
+    Args:
+        session_id: Session identifier
+        agent_type: Agent type ('context', 'contract', 'classifier')
+    
+    Returns:
+        Tuple of (user_memory, agent_memory)
+    """
+    manager = get_scoped_memory_manager()
+    user_memory = manager.get_user_memory(session_id)
+    agent_memory = manager.get_agent_memory(session_id, agent_type)
+    
+    return user_memory, agent_memory 

@@ -1,3 +1,0 @@
-DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
-REDIS_URL=redis://redis:6379/0
-PINECONE_API_KEY=pcsk_4wS2vJ_2xTQyRgRshoXUWbvH63guzhxn1tCSjPUmqWgU35opaps9qrZk72qmRqUZgjCVMb .env
